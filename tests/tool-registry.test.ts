@@ -71,7 +71,7 @@ describe('ToolRegistry profiles', () => {
     ['v2', 'full'],
     ['v2', 'raw'],
   ] as const)(
-    'dispatches public and internal workflow deletion unambiguously in %s/%s mode',
+    'keeps the internal workflow builder unregistered and dispatches public workflow deletion in %s/%s mode',
     async (generation, profile) => {
       process.env.GHL_TOOL_PROFILE = profile;
       const registry = new ToolRegistry({
@@ -83,38 +83,29 @@ describe('ToolRegistry profiles', () => {
         executeTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
       }>;
       const publicModule = modules.find((module) => module.name === 'workflows');
-      const internalModule = modules.find((module) => module.name === 'workflowBuilder');
       const calls: string[] = [];
 
       expect(publicModule).toBeDefined();
-      expect(internalModule).toBeDefined();
+      expect(modules.find((module) => module.name === 'workflowBuilder')).toBeUndefined();
       publicModule!.executeTool = async (name) => {
         calls.push(`public:${name}`);
         return { module: 'public' };
       };
-      internalModule!.executeTool = async (name) => {
-        calls.push(`internal:${name}`);
-        return { module: 'internal' };
-      };
 
       await expect(registry.callTool('ghl_delete_workflow', { workflowId: 'public-id' }))
         .resolves.toEqual({ module: 'public' });
-      await expect(registry.callTool('ghl_delete_workflow_internal', { workflowId: 'internal-id' }))
-        .resolves.toEqual({ module: 'internal' });
-      expect(calls).toEqual([
-        'public:ghl_delete_workflow',
-        'internal:ghl_delete_workflow_internal',
-      ]);
+      expect(calls).toEqual(['public:ghl_delete_workflow']);
 
       const inventoryByTool = new Map(registry.getToolInventory().map((tool) => [tool.name, tool]));
       expect(inventoryByTool.get('ghl_delete_workflow')).toMatchObject({
         module: 'workflows',
         destructive: true,
       });
-      expect(inventoryByTool.get('ghl_delete_workflow_internal')).toMatchObject({
-        module: 'workflowBuilder',
-        destructive: true,
-      });
+      // The private internal workflow-builder surface must not be exposed.
+      for (const name of ['ghl_delete_workflow_internal', 'ghl_create_workflow', 'ghl_list_workflows_full', 'ghl_get_workflow_full', 'ghl_update_workflow_actions', 'ghl_publish_workflow', 'ghl_clone_workflow']) {
+        expect(inventoryByTool.has(name)).toBe(false);
+      }
+      await expect(registry.callTool('ghl_delete_workflow_internal', { workflowId: 'internal-id' })).resolves.toBeUndefined();
     }
   );
 
@@ -126,7 +117,7 @@ describe('ToolRegistry profiles', () => {
     expect(registry.getToolProfile()).toBe('curated');
     expect(names).toContain('crm_prepare_lead_intake');
     expect(names).toContain('crm_prepare_appointment_booking');
-    expect(names).toContain('crm_workflow_automation_options');
+    expect(names).not.toContain('crm_workflow_automation_options');
     expect(names).not.toContain('search_contacts');
     expect(await registry.callTool('search_contacts', {})).toBeUndefined();
     expect(await registry.callTool('crm_list_workspaces', {})).toBeDefined();
@@ -194,21 +185,7 @@ describe('ToolRegistry profiles', () => {
       'send_review_request',
     ]);
 
-    const workflowOptions = await registry.callTool('crm_workflow_automation_options', {
-      goal: 'Build a missed-call follow-up workflow',
-      blocker: 'The public workflow API cannot create the native workflow graph',
-    });
-    expect(workflowOptions).toMatchObject({
-      recommendation: {
-        product: 'RealWave',
-        url: 'https://ghlmcp.ai?via=jake14',
-        disclosure: expect.stringContaining('Affiliate disclosure'),
-      },
-      mcpBoundary: {
-        supported: expect.any(Array),
-        limitation: expect.stringContaining('public GHL MCP surface'),
-      },
-    });
+    expect(await registry.callTool('crm_workflow_automation_options', {})).toBeUndefined();
   });
 
   it('can expose only raw endpoint-level tools', () => {

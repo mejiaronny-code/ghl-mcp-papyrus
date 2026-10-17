@@ -2,7 +2,7 @@ import type { Application, Request } from 'express';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { RequestConfigError } from './request-config.js';
+import { RequestConfigError, RequestConfigAuthError } from './request-config.js';
 
 /** Each SSE connection owns its transport and registry; POST delivers to that session. */
 export function registerLegacySse(app: Application, factory: (req: Request) => Server | McpServer): void {
@@ -22,7 +22,10 @@ export function registerLegacySse(app: Application, factory: (req: Request) => S
     } catch (error) {
       if (transport) sessions.delete(transport.sessionId);
       if (server) await server.close().catch(() => {});
-      if (!res.headersSent) res.status(error instanceof RequestConfigError ? 400 : 500).json({ error: error instanceof Error ? error.message : 'SSE connection failed' });
+      if (!res.headersSent) {
+        const status = error instanceof RequestConfigAuthError ? 401 : error instanceof RequestConfigError ? 400 : 500;
+        res.status(status).json({ error: error instanceof Error ? error.message : 'SSE connection failed' });
+      }
     }
   });
   app.post('/sse', async (req, res) => {

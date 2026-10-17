@@ -10,7 +10,7 @@ import type { ToolRegistry } from './tool-registry.js';
 import type { GHLConfig } from './types/ghl-types.js';
 import { EnhancedGHLClient } from './enhanced-ghl-client.js';
 import { ToolRegistry as ToolRegistryClass } from './tool-registry.js';
-import { resolveRequestConfig, RequestConfigError } from './request-config.js';
+import { resolveRequestConfig, RequestConfigError, RequestConfigAuthError } from './request-config.js';
 import { toolFailed, toolFailureMessage } from '../scripts/tool-results.cjs';
 import { ToolInputError } from '../scripts/tool-schema.cjs';
 
@@ -53,11 +53,8 @@ export function registerExecuteRoutes(
     }
 
     try {
-      let registry = defaultRegistry;
-      if (baseConfig) {
-        const config = resolveRequestConfig(baseConfig, req.headers);
-        if (config !== baseConfig) registry = new ToolRegistryClass(new EnhancedGHLClient(config));
-      }
+      const config = resolveRequestConfig(baseConfig, req.headers);
+      const registry = config === baseConfig ? defaultRegistry : new ToolRegistryClass(new EnhancedGHLClient(config));
       const result = await registry.callTool(toolName, toolArgs);
       if (result === undefined) {
         res.status(404).json({ ok: false, error: { message: `Unknown tool: ${toolName}` } });
@@ -70,7 +67,9 @@ export function registerExecuteRoutes(
       res.json({ ok: true, result });
     } catch (err: any) {
       console.error(`[execute-route] POST /execute tool=${toolName} error:`, err.message);
-      res.status(err instanceof RequestConfigError || err instanceof ToolInputError ? 400 : 500).json({ ok: false, error: { message: err.message } });
+      const status = err instanceof RequestConfigAuthError ? 401
+        : err instanceof RequestConfigError || err instanceof ToolInputError ? 400 : 500;
+      res.status(status).json({ ok: false, error: { message: err.message } });
     }
   });
 }

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 
 const root = join(__dirname, '..');
+const SECRET = 'transport-test-shared-secret-9012345678';
 let provider: Server;
 let providerUrl: string;
 beforeAll(async () => {
@@ -25,7 +26,7 @@ async function smoke(file: string, dataPath: string, bindHost?: string) {
   const child = spawn(process.execPath, [join(root,file)], {cwd:root, env:{
     PATH:process.env.PATH, GHL_API_KEY:'test-token', GHL_LOCATION_ID:'test-location', GHL_BASE_URL:providerUrl,
     PORT:String(port), GHL_MCP_APPS_PORT:String(port), GHL_TOOL_PROFILE:'curated', GHL_API_GENERATION:'v3',
-    GHL_MCP_AUTH_TOKEN:'transport-test', GHL_MCP_ALLOWED_ORIGINS:'https://ops.example.internal',
+    ALLOW_BASE_ACCOUNT:'true', MCP_SHARED_SECRET:SECRET, GHL_MCP_ALLOWED_ORIGINS:'https://ops.example.internal',
     ...(bindHost ? {GHL_MCP_BIND_HOST:bindHost} : {}),
   },stdio:['ignore','pipe','pipe']});
   let output = ''; child.stdout.on('data', chunk => output += chunk); child.stderr.on('data', chunk => output += chunk);
@@ -41,12 +42,12 @@ async function smoke(file: string, dataPath: string, bindHost?: string) {
     if (!ready) throw new Error('Server did not start: '+output);
     expect(output).toContain(`bind=${bindHost || '127.0.0.1'}:${port}`);
     expect((await fetch(base+dataPath)).status).toBe(401);
-    expect((await fetch(base+dataPath,{headers:{Origin:'https://evil.example',Authorization:'Bearer transport-test'}})).status).toBe(403);
-    const result = await fetch(base+dataPath,{headers:{Origin:'https://ops.example.internal',Authorization:'Bearer transport-test'}});
+    expect((await fetch(base+dataPath,{headers:{Origin:'https://evil.example',Authorization:`Bearer ${SECRET}`}})).status).toBe(403);
+    const result = await fetch(base+dataPath,{headers:{Origin:'https://ops.example.internal',Authorization:`Bearer ${SECRET}`}});
     expect(result.status).toBe(200);
     expect(result.headers.get('access-control-allow-origin')).toBe('https://ops.example.internal');
     if (file === 'dist/main.js' || file === 'mcp-apps/dist/main.js') {
-      const init = await fetch(base+'/mcp', {method:'POST', headers:{Authorization:'Bearer transport-test','Content-Type':'application/json',Accept:'application/json, text/event-stream'}, body:JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'test',version:'1'}}})});
+      const init = await fetch(base+'/mcp', {method:'POST', headers:{Authorization:`Bearer ${SECRET}`,'Content-Type':'application/json',Accept:'application/json, text/event-stream'}, body:JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'test',version:'1'}}})});
       expect(init.status).toBe(200);
       expect(await init.text()).toContain('serverInfo');
     }

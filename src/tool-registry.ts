@@ -52,7 +52,6 @@ import { TemplatesTools } from './tools/templates-tools.js';
 import { TriggersTools } from './tools/triggers-tools.js';
 import { UsersTools } from './tools/users-tools.js';
 import { WebhooksTools } from './tools/webhooks-tools.js';
-import { WorkflowBuilderTools } from './tools/workflow-builder-tools.js';
 import { PhoneSystemTools } from './tools/phone-system-tools.js';
 import { VoiceAITools } from './tools/voice-ai-tools.js';
 import { ProposalsTools } from './tools/proposals-tools.js';
@@ -348,9 +347,10 @@ export class ToolRegistry {
     this.addModule('workflowInsights', workflowInsightsTools, 'getToolDefinitions', 'handleToolCall');
     this.addModule('agentWorkspace', agentWorkspaceTools, 'getToolDefinitions', 'handleToolCall');
 
-    // Workflow Builder — internal API with Firebase auth (no GHL API client dependency)
-    const workflowBuilderTools = new WorkflowBuilderTools();
-    this.addModule('workflowBuilder', workflowBuilderTools, 'getTools', 'executeWorkflowBuilderTool');
+    // NOTE: the WorkflowBuilderTools module (internal backend.leadconnectorhq.com
+    // workflow API with Firebase browser-derived auth) is intentionally NOT
+    // registered. The client stays in src/clients/workflow-builder-client.ts,
+    // but no MCP tool exposes that private surface.
   }
 
   private addModule(

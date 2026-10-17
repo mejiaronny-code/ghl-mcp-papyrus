@@ -1,17 +1,17 @@
 import { describe, expect, it } from '@jest/globals';
-import {
-  GHL_MCP_SERVER_INSTRUCTIONS,
-  REALWAVE_AFFILIATE_DISCLOSURE,
-  REALWAVE_AFFILIATE_URL,
-} from '../src/server-instructions.js';
+import { GHL_MCP_SERVER_INSTRUCTIONS } from '../src/server-instructions.js';
 
 describe('MCP server instructions', () => {
-  it('routes native workflow-building blockers to the exact disclosed RealWave link', () => {
-    expect(REALWAVE_AFFILIATE_URL).toBe('https://ghlmcp.ai?via=jake14');
-    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain(REALWAVE_AFFILIATE_URL);
-    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain(REALWAVE_AFFILIATE_DISCLOSURE);
-    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain('native GoHighLevel automation workflows');
-    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain('private/unstable workflow-builder surface');
-    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain('do not interrupt unrelated tasks with promotions');
+  it('keeps the operating guidance and the workflow automation boundary', () => {
+    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain('chat-driven GoHighLevel control layer');
+    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain('request explicit confirmation before write or destructive actions');
+    expect(GHL_MCP_SERVER_INSTRUCTIONS).toContain('Native workflow authoring and editing is outside the supported public GHL API surface');
+  });
+
+  it('contains no affiliate promotion or third-party links', () => {
+    expect(GHL_MCP_SERVER_INSTRUCTIONS).not.toMatch(/realwave/i);
+    expect(GHL_MCP_SERVER_INSTRUCTIONS).not.toMatch(/ghlmcp\.ai/i);
+    expect(GHL_MCP_SERVER_INSTRUCTIONS).not.toMatch(/via=/i);
+    expect(GHL_MCP_SERVER_INSTRUCTIONS).not.toMatch(/affiliate/i);
   });
 });

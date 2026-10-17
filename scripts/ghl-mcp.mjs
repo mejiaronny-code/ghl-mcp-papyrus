@@ -1110,7 +1110,7 @@ function failToolCall(name, error, options, details = {}) {
 
 function sanitizeErrorMessage(error) {
   let message = String(error?.message || error || 'Unknown error');
-  for (const key of ['GHL_API_KEY', 'GHL_MCP_AUTH_TOKEN']) {
+  for (const key of ['GHL_API_KEY', 'GHL_MCP_AUTH_TOKEN', 'MCP_SHARED_SECRET']) {
     const secret = process.env[key];
     if (secret) message = message.split(secret).join('[REDACTED]');
   }

@@ -5,8 +5,8 @@
 import express from 'express';
 import { registerExecuteRoutes } from './execute-route.js';
 import { registerLegacySse } from './legacy-sse.js';
-import { resolveRequestConfig } from './request-config.js';
-import { createHttpApp, resolveBindHost, describeBinding } from '../scripts/http-security.cjs';
+import { resolveRequestConfig, buildBaseAccountConfig, createShellConfig } from './request-config.js';
+import { createHttpApp, resolveBindHost, describeBinding, assertSharedSecretConfigured } from '../scripts/http-security.cjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
@@ -20,7 +20,6 @@ import * as dotenv from 'dotenv';
 import { GHLApiClient } from './clients/ghl-api-client.js';
 import { ToolRegistry } from './tool-registry.js';
 import { GHLConfig } from './types/ghl-types.js';
-import { resolveVersion } from './clients/version-router.js';
 import { GHL_MCP_SERVER_INSTRUCTIONS } from './server-instructions.js';
 
 dotenv.config();
@@ -29,32 +28,16 @@ class GHLMCPHttpServer {
   private app: express.Application;
   private ghlClient: GHLApiClient;
   private registry: ToolRegistry;
+  private baseConfig: GHLConfig | undefined;
   private port: number;
 
   constructor() {
     this.port = parseInt(process.env.PORT || process.env.MCP_SERVER_PORT || '8000', 10);
     this.app = createHttpApp();
-    this.ghlClient = this.initializeGHLClient();
+    this.baseConfig = buildBaseAccountConfig();
+    this.ghlClient = new GHLApiClient(this.baseConfig ?? createShellConfig());
     this.registry = new ToolRegistry(this.ghlClient);
     this.setupRoutes();
-  }
-
-  private initializeGHLClient(): GHLApiClient {
-    const apiGeneration = process.env.GHL_API_GENERATION === 'v2' ? 'v2' : 'v3';
-    const config: GHLConfig = {
-      accessToken: process.env.GHL_API_KEY || '',
-      baseUrl: process.env.GHL_BASE_URL || 'https://services.leadconnectorhq.com',
-      version: resolveVersion([], apiGeneration, process.env.GHL_API_VERSION),
-      locationId: process.env.GHL_LOCATION_ID || '',
-      apiGeneration,
-      userType: process.env.GHL_USER_TYPE === 'Company' || process.env.GHL_USER_TYPE === 'Location'
-        ? process.env.GHL_USER_TYPE
-        : undefined,
-    };
-
-    if (!config.accessToken) throw new Error('GHL_API_KEY environment variable is required');
-    if (!config.locationId) throw new Error('GHL_LOCATION_ID environment variable is required');
-    return new GHLApiClient(config);
   }
 
   private createSSEServer(registry = this.registry): Server {
@@ -90,11 +73,11 @@ class GHLMCPHttpServer {
       });
     });
 
-    const config = this.ghlClient.getConfig();
+    const config = this.baseConfig;
     registerExecuteRoutes(this.app, this.registry, config);
     registerLegacySse(this.app, (req) => {
       const requestConfig = resolveRequestConfig(config, req.headers);
-      const registry = requestConfig === config ? this.registry : new ToolRegistry(new GHLApiClient(requestConfig));
+      const registry = config && requestConfig === config ? this.registry : new ToolRegistry(new GHLApiClient(requestConfig));
       return this.createSSEServer(registry);
     });
 
@@ -115,7 +98,10 @@ class GHLMCPHttpServer {
   }
 
   async start(): Promise<void> {
-    await this.ghlClient.testConnection();
+    assertSharedSecretConfigured();
+    if (this.baseConfig) {
+      await this.ghlClient.testConnection();
+    }
     const bindHost = resolveBindHost();
     this.app.listen(this.port, bindHost, () => {
       console.log(describeBinding(bindHost, this.port));

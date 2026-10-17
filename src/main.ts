@@ -5,7 +5,7 @@
  */
 
 import express from 'express';
-import { createHttpApp, resolveBindHost, describeBinding } from '../scripts/http-security.cjs';
+import { createHttpApp, resolveBindHost, describeBinding, assertSharedSecretConfigured } from '../scripts/http-security.cjs';
 import * as dotenv from 'dotenv';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,7 +17,7 @@ import { ToolRegistry } from './tool-registry.js';
 import { GHLConfig } from './types/ghl-types.js';
 import { registerExecuteRoutes } from './execute-route.js';
 import { resolveVersion } from './clients/version-router.js';
-import { resolveRequestConfig, RequestConfigError } from './request-config.js';
+import { resolveRequestConfig, buildBaseAccountConfig, createShellConfig, RequestConfigError, RequestConfigAuthError } from './request-config.js';
 import { registerLegacySse } from './legacy-sse.js';
 import { GHL_MCP_SERVER_INSTRUCTIONS } from './server-instructions.js';
 
@@ -33,24 +33,6 @@ function log(level: LogLevel, msg: string, data?: Record<string, unknown>) {
   out.write(JSON.stringify({ ts: new Date().toISOString(), level, msg, ...(data || {}) }) + '\n');
 }
 
-function readConfig(): GHLConfig {
-  const apiGeneration = (process.env.GHL_API_GENERATION === 'v2' ? 'v2' : 'v3') as 'v3' | 'v2';
-  const config: GHLConfig = {
-    accessToken: process.env.GHL_API_KEY || '',
-    baseUrl: process.env.GHL_BASE_URL || 'https://services.leadconnectorhq.com',
-    version: resolveVersion([], apiGeneration, process.env.GHL_API_VERSION),
-    locationId: process.env.GHL_LOCATION_ID || '',
-    apiGeneration,
-    userType: process.env.GHL_USER_TYPE === 'Company' || process.env.GHL_USER_TYPE === 'Location'
-      ? process.env.GHL_USER_TYPE
-      : undefined,
-  };
-
-  if (!config.accessToken) throw new Error('GHL_API_KEY is required');
-  if (!config.locationId) throw new Error('GHL_LOCATION_ID is required');
-  return config;
-}
-
 function createMcpServer(client: EnhancedGHLClient): McpServer {
   const server = new McpServer(
     { name: 'ghl-mcp-server', version: '3.0.0' },
@@ -64,21 +46,30 @@ function createMcpServer(client: EnhancedGHLClient): McpServer {
 }
 
 async function main() {
+  // Fail closed: no inbound shared secret, no server.
+  assertSharedSecretConfigured();
+
   const port = parseInt(process.env.PORT || process.env.MCP_SERVER_PORT || '8000', 10);
-  const config = readConfig();
-  const ghlClient = new EnhancedGHLClient(config);
-  const registry = new ToolRegistry(ghlClient);
+  const config = buildBaseAccountConfig();
+  if (!config && (process.env.GHL_API_KEY || process.env.GHL_LOCATION_ID)) {
+    log('warn', 'GHL_API_KEY/GHL_LOCATION_ID are set but the base account stays disabled; set ALLOW_BASE_ACCOUNT=true to enable headerless access');
+  }
+  const ghlClient = config ? new EnhancedGHLClient(config) : undefined;
+  const registry = new ToolRegistry(ghlClient ?? new EnhancedGHLClient(createShellConfig()));
   const toolCount = registry.getToolCount();
   const startTime = Date.now();
 
   log('info', 'Initializing GHL MCP server', {
-    baseUrl: config.baseUrl,
-    version: config.version,
-    locationId: config.locationId,
+    baseUrl: config?.baseUrl,
+    version: config?.version ?? resolveVersion([], 'v3', process.env.GHL_API_VERSION),
+    locationId: config ? config.locationId : undefined,
+    baseAccount: config ? 'enabled' : 'disabled (per-request x-ghl-access-token/x-ghl-location-id required)',
     tools: toolCount,
   });
 
-  await ghlClient.testConnection();
+  if (ghlClient) {
+    await ghlClient.testConnection();
+  }
 
   const app = createHttpApp();
   app.use((req, _res, next) => {
@@ -89,7 +80,7 @@ async function main() {
   app.all('/mcp', async (req, res) => {
     try {
       const requestConfig = resolveRequestConfig(config, req.headers);
-      const client = requestConfig === config ? ghlClient : new EnhancedGHLClient(requestConfig);
+      const client = ghlClient && requestConfig === config ? ghlClient : new EnhancedGHLClient(requestConfig);
       const requestServer = createMcpServer(client);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       await requestServer.connect(transport);
@@ -99,13 +90,16 @@ async function main() {
       });
     } catch (err: any) {
       log('error', 'Streamable HTTP error', { error: err.message });
-      if (!res.headersSent) res.status(err instanceof RequestConfigError ? 400 : 500).json({ error: err instanceof RequestConfigError ? err.message : 'Internal server error' });
+      if (!res.headersSent) {
+        const status = err instanceof RequestConfigAuthError ? 401 : err instanceof RequestConfigError ? 400 : 500;
+        res.status(status).json({ error: err instanceof RequestConfigError ? err.message : 'Internal server error' });
+      }
     }
   });
 
   registerLegacySse(app, (req) => {
     const requestConfig = resolveRequestConfig(config, req.headers);
-    return createMcpServer(requestConfig === config ? ghlClient : new EnhancedGHLClient(requestConfig));
+    return createMcpServer(ghlClient && requestConfig === config ? ghlClient! : new EnhancedGHLClient(requestConfig));
   });
 
   app.get('/', (_req, res) => {
@@ -123,7 +117,7 @@ async function main() {
         sse: '/sse',
       },
       tools: registry.getToolCounts(),
-      cache: ghlClient.getCacheStats(),
+      ...(ghlClient ? { cache: ghlClient.getCacheStats() } : {}),
     });
   });
 
@@ -141,7 +135,7 @@ async function main() {
         heapUsed: `${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
         heapTotal: `${Math.round(mem.heapTotal / 1024 / 1024)}MB`,
       },
-      cache: ghlClient.getCacheStats(),
+      ...(ghlClient ? { cache: ghlClient.getCacheStats() } : {}),
     });
   });
 
@@ -172,6 +166,7 @@ async function main() {
     console.log(`Streamable HTTP: http://${bindHost}:${port}/mcp`);
     console.log(`Legacy SSE: http://${bindHost}:${port}/sse`);
     console.log(`Tools: ${toolCount}`);
+    if (!ghlClient) console.log('Base account disabled: every request must carry x-ghl-access-token and x-ghl-location-id');
   });
 
 }
