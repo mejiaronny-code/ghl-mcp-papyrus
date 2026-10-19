@@ -18,9 +18,12 @@ describe('ToolRegistry profiles', () => {
   beforeEach(() => {
     delete process.env.GHL_TOOL_PROFILE;
     delete process.env.GHL_API_GENERATION;
+    // These tests cover the upstream surface, planner tools included.
+    process.env.GHL_SHOW_PLANNER_TOOLS = 'true';
   });
 
   afterEach(() => {
+    delete process.env.GHL_SHOW_PLANNER_TOOLS;
     if (previousProfile === undefined) {
       delete process.env.GHL_TOOL_PROFILE;
     } else {
@@ -31,6 +34,17 @@ describe('ToolRegistry profiles', () => {
     } else {
       process.env.GHL_API_GENERATION = previousGeneration;
     }
+  });
+
+  it('Papyrus default hides planner-only tools and the handler-less CSV tool', () => {
+    delete process.env.GHL_SHOW_PLANNER_TOOLS;
+    const names = new ToolRegistry(mockClient as any).getAllToolNames();
+    expect(names).toContain('crm_contact_workspace');
+    expect(names).toContain('search_contacts');
+    expect(names).not.toContain('crm_prepare_lead_intake');
+    expect(names).not.toContain('crm_location_health_check');
+    expect(names).not.toContain('crm_get_next_page');
+    expect(names).not.toContain('get_csv_upload_status');
   });
 
   it('defaults to full profile with raw and curated tools', () => {

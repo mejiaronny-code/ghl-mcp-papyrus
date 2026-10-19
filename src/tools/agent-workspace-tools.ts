@@ -660,6 +660,16 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
   },
 ];
 
+/**
+ * Papyrus (19-oct): curated tools that never read data — they only return a
+ * plan ("call these raw tools next"). Useful for coding agents, but in a chat
+ * agent with its own write flow they were picked for plain questions and their
+ * empty "plan" read as "no data". Hidden unless GHL_SHOW_PLANNER_TOOLS=true.
+ */
+export const PLANNER_ONLY_TOOLS: ReadonlySet<string> = new Set(
+  WORKSPACE_SPECS.filter((spec) => !spec.readPlan?.length).map((spec) => spec.name),
+);
+
 export class AgentWorkspaceTools {
   constructor(private ghlClient: GHLApiClient) {}
 

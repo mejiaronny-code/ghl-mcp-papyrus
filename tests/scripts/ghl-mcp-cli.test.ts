@@ -168,7 +168,8 @@ describe('ghl-mcp onboarding CLI', () => {
     expect(list.status).toBe(0);
     const inventory = JSON.parse(list.stdout);
     expect(inventory.profile).toBe('full');
-    expect(inventory.count).toBeGreaterThan(900);
+    // Papyrus hides 31 planner-only tools + 1 handler-less tool by default (887).
+    expect(inventory.count).toBeGreaterThan(850);
     expect(inventory.tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'get_contact', access: 'read' }),

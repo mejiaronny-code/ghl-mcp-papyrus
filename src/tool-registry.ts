@@ -62,7 +62,11 @@ import { NotesTools } from './tools/notes-tools.js';
 import { OAuthTools } from './tools/oauth-tools.js';
 import { OfficialSpecTools } from './tools/official-spec-tools.js';
 import { WorkflowInsightsTools } from './tools/workflow-insights-tools.js';
-import { AgentWorkspaceTools } from './tools/agent-workspace-tools.js';
+import { AgentWorkspaceTools, PLANNER_ONLY_TOOLS } from './tools/agent-workspace-tools.js';
+
+// Papyrus (19-oct, scripts/audit-tools.mjs): listed but with no handler in its
+// module — every call answered "Unknown tool".
+const BROKEN_TOOLS: ReadonlySet<string> = new Set(['get_csv_upload_status']);
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -493,6 +497,8 @@ export class ToolRegistry {
   private isToolVisible(name: string): boolean {
     const tool = this.allToolDefs.find((item) => item.name === name);
     if (!tool) return false;
+    if (BROKEN_TOOLS.has(name)) return false;
+    if (PLANNER_ONLY_TOOLS.has(name) && process.env.GHL_SHOW_PLANNER_TOOLS !== 'true') return false;
     const category = ((tool as any)._meta?.labels?.category || '').toString();
     const source = ((tool as any)._meta?.labels?.source || '').toString();
     const isCurated = category === 'agent-workspace' || source === 'curated-agent-workspace';
