@@ -92,7 +92,7 @@ export class ContactTools {
       },
       {
         name: 'search_contacts',
-        description: 'Search for contacts with advanced filtering options',
+        description: 'Search or list contacts with advanced filtering options. The response includes `total` = how many contacts match in the whole account (use it for "how many contacts do I have?"; with no filters it is the account total). `contacts` is only one page of results.',
         inputSchema: {
           type: 'object',
           properties: {

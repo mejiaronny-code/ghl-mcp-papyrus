@@ -71,7 +71,7 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
   {
     name: 'crm_location_overview',
     title: 'Location Overview',
-    description: 'Gather one compact, read-only operating overview for a GHL location: location profile, contacts, pipelines, calendars, products, and email activity.',
+    description: 'Gather one compact, read-only operating overview for a GHL location: location profile plus SMALL SAMPLES (about 5 items each) of recent contacts, pipelines, calendars, products, and email activity. It does NOT return totals: to count contacts ("how many contacts do I have?") use search_contacts, which returns the total.',
     app: 'agency-admin',
     access: 'read',
     readPlan: [
@@ -859,13 +859,16 @@ function resultSummary(readResults: unknown[], actions: WorkflowAction[]): JsonR
   };
 }
 
+// Papyrus (19-oct): the sample size used to be labelled `count`, and agents
+// answered "how many contacts?" with the 5-item sample ("tienes 5 contactos").
+// It is now `shown_in_this_sample`; a real `total` from GHL is kept as-is.
 function summarizeData(data: unknown): unknown {
-  if (Array.isArray(data)) return { count: data.length, items: data.slice(0, 5) };
+  if (Array.isArray(data)) return { shown_in_this_sample: Math.min(data.length, 5), returned: data.length, items: data.slice(0, 5) };
   if (!isRecord(data)) return data;
   const summary: JsonRecord = {};
   for (const [key, value] of Object.entries(data)) {
     if (Array.isArray(value)) {
-      summary[key] = { count: value.length, items: value.slice(0, 5) };
+      summary[key] = { shown_in_this_sample: Math.min(value.length, 5), returned: value.length, items: value.slice(0, 5) };
     } else if (isRecord(value)) {
       summary[key] = Object.fromEntries(Object.entries(value).slice(0, 12));
     } else {
