@@ -63,7 +63,7 @@ import { OAuthTools } from './tools/oauth-tools.js';
 import { OfficialSpecTools } from './tools/official-spec-tools.js';
 import { WorkflowInsightsTools } from './tools/workflow-insights-tools.js';
 import { AgentWorkspaceTools, PLANNER_ONLY_TOOLS } from './tools/agent-workspace-tools.js';
-import { VERIFIED_BROKEN_TOOLS } from './verified-broken-tools.js';
+import { VERIFIED_BROKEN_TOOLS, INFERRED_BROKEN_TOOLS } from './verified-broken-tools.js';
 
 // Papyrus (19-oct, scripts/audit-tools.mjs): listed but with no handler in its
 // module — every call answered "Unknown tool".
@@ -499,7 +499,7 @@ export class ToolRegistry {
     const tool = this.allToolDefs.find((item) => item.name === name);
     if (!tool) return false;
     if (BROKEN_TOOLS.has(name)) return false;
-    if (VERIFIED_BROKEN_TOOLS.has(name) && process.env.GHL_SHOW_UNVERIFIED_TOOLS !== 'true') return false;
+    if ((VERIFIED_BROKEN_TOOLS.has(name) || INFERRED_BROKEN_TOOLS.has(name)) && process.env.GHL_SHOW_UNVERIFIED_TOOLS !== 'true') return false;
     if (PLANNER_ONLY_TOOLS.has(name) && process.env.GHL_SHOW_PLANNER_TOOLS !== 'true') return false;
     const category = ((tool as any)._meta?.labels?.category || '').toString();
     const source = ((tool as any)._meta?.labels?.source || '').toString();
