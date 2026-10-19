@@ -169,8 +169,8 @@ describe('ghl-mcp onboarding CLI', () => {
     const inventory = JSON.parse(list.stdout);
     expect(inventory.profile).toBe('full');
     // Papyrus hides 31 planner-only tools, 1 handler-less tool and 49 routes
-    // verified as nonexistent in live GHL by default (838).
-    expect(inventory.count).toBeGreaterThan(800);
+    // verified as nonexistent in live GHL plus 65 inferred siblings (773).
+    expect(inventory.count).toBeGreaterThan(700);
     expect(inventory.tools).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'get_contact', access: 'read' }),
