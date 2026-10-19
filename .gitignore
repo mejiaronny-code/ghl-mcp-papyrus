@@ -52,3 +52,6 @@ pids/
 tmp/
 temp/ 
 .vercel
+live-read-audit.json
+live-read-audit.dry.txt
+audit-tools.json
