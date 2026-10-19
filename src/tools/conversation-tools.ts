@@ -267,7 +267,7 @@ export class ConversationTools {
       },
       {
         name: 'get_recent_messages',
-        description: 'Get recent messages across all conversations for monitoring',
+        description: 'Get the most recent messages across all conversations (mensajes nuevos / recientes / de hoy, qué me escribieron). Use for "what new messages came in?". For bulk exports of all history use the export endpoint only when the user asks to export.',
         inputSchema: {
           type: 'object',
           properties: {

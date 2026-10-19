@@ -80,7 +80,7 @@ export class OpportunityTools {
       },
       {
         name: 'get_pipelines',
-        description: 'Get all sales pipelines configured in GoHighLevel',
+        description: 'Get all sales pipelines (embudos de venta / pipelines de oportunidades) and their stages (etapas con oportunidades/negocios) configured in GoHighLevel. Use for "what sales pipelines do I have / qué etapas tiene mi embudo de ventas?". Not published website funnels or landing pages (get_funnels).',
         inputSchema: {
           type: 'object',
           properties: {}

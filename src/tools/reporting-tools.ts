@@ -149,7 +149,7 @@ export class ReportingTools {
       // Funnel Reports
       {
         name: 'get_funnel_reports',
-        description: 'Get funnel performance reports (page views, conversions)',
+        description: 'Get website funnel performance reports: page views, visits, opt-ins and conversion rates (cómo convierten mis funnels / visitas y conversiones).',
         inputSchema: {
           type: 'object',
           properties: {

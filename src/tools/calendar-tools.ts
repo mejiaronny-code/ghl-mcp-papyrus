@@ -1071,7 +1071,7 @@ export class CalendarTools {
       },
       {
         name: 'get_blocked_slots',
-        description: 'Get blocked time slots for a location',
+        description: 'Get blocked time slots (horarios bloqueados / bloqueos de agenda) for a location: periods marked unavailable on calendars. Use for "which hours are blocked?"; for free slots or appointments use the calendar/appointment tools.',
         inputSchema: {
           type: 'object',
           properties: {

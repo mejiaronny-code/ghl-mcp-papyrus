@@ -12,7 +12,7 @@ export class FunnelsTools {
     return [
       {
         name: 'get_funnels',
-        description: 'Get all funnels for a location. Funnels are multi-page sales/marketing flows.',
+        description: 'Get all website funnels (funnels publicados, embudos de páginas web / landing pages) for a location: multi-page website flows built in the funnel builder. NOT the sales pipeline of opportunities (for "embudos de venta" with stages and deals use get_pipelines). Returns the list only; for visits/conversions use get_funnel_reports.',
         inputSchema: {
           type: 'object',
           properties: {
