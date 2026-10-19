@@ -1394,15 +1394,23 @@ export class CalendarTools {
         groupId: params.groupId
       };
 
-      const response = await this.ghlClient.getCalendarEvents(eventParams);
-      
-      if (!response.success || !response.data) {
-        const errorMsg = response.error?.message || 'Unknown API error';
-        throw new Error(`API request failed: ${errorMsg}`);
+      // Papyrus (19-oct, auditoría en vivo): GHL exige calendarId, userId o
+      // groupId ("Either of userId, calendarId or groupId is required"). Sin
+      // ninguno ("¿qué citas tengo esta semana?") se consultan todos los
+      // calendarios de la cuenta (máx. 15) y se juntan los eventos.
+      let events: GHLCalendarEvent[] = [];
+      if (!eventParams.userId && !eventParams.calendarId && !eventParams.groupId) {
+        events = await this.eventsAcrossCalendars((calendarId) =>
+          this.ghlClient.getCalendarEvents({ ...eventParams, calendarId }));
+      } else {
+        const response = await this.ghlClient.getCalendarEvents(eventParams);
+        if (!response.success || !response.data) {
+          const errorMsg = response.error?.message || 'Unknown API error';
+          throw new Error(`API request failed: ${errorMsg}`);
+        }
+        const data = response.data as GHLGetCalendarEventsResponse;
+        events = Array.isArray(data.events) ? data.events : [];
       }
-
-      const data = response.data as GHLGetCalendarEventsResponse;
-      const events = Array.isArray(data.events) ? data.events : [];
       
       return {
         success: true,
@@ -2201,6 +2209,22 @@ export class CalendarTools {
   /**
    * GET BLOCKED SLOTS
    */
+  /** Papyrus: consulta cada calendario de la cuenta (máx. 15) y junta los eventos. */
+  private async eventsAcrossCalendars(fetch: (calendarId: string) => Promise<any>): Promise<any[]> {
+    const list = await this.ghlClient.getCalendars();
+    if (!list.success || !list.data) {
+      throw new Error(`API request failed: ${list.error?.message || 'could not list calendars'}`);
+    }
+    const calendars = ((list.data as any).calendars || []).slice(0, 15);
+    const results = await Promise.all(calendars.map(async (cal: any) => {
+      const response = await fetch(cal.id);
+      if (!response?.success || !response.data) return [];
+      const items = Array.isArray(response.data.events) ? response.data.events : [];
+      return items.map((item: any) => ({ calendarName: cal.name, ...item }));
+    }));
+    return results.flat();
+  }
+
   private async getBlockedSlots(params: MCPGetBlockedSlotsParams): Promise<{ success: boolean; slots: any[]; message: string }> {
     try {
       const eventParams = {
@@ -2212,14 +2236,19 @@ export class CalendarTools {
         groupId: params.groupId
       };
 
-      const response = await this.ghlClient.getBlockedSlots(eventParams);
-      
-      if (!response.success || !response.data) {
-        const errorMsg = response.error?.message || 'Unknown API error';
-        throw new Error(`API request failed: ${errorMsg}`);
+      // Papyrus (19-oct): mismo requisito de GHL que get_calendar_events.
+      let slots: any[] = [];
+      if (!eventParams.userId && !eventParams.calendarId && !eventParams.groupId) {
+        slots = await this.eventsAcrossCalendars((calendarId) =>
+          this.ghlClient.getBlockedSlots({ ...eventParams, calendarId }));
+      } else {
+        const response = await this.ghlClient.getBlockedSlots(eventParams);
+        if (!response.success || !response.data) {
+          const errorMsg = response.error?.message || 'Unknown API error';
+          throw new Error(`API request failed: ${errorMsg}`);
+        }
+        slots = Array.isArray(response.data.events) ? response.data.events : [];
       }
-
-      const slots = Array.isArray(response.data.events) ? response.data.events : [];
       
       return {
         success: true,

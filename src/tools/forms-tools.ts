@@ -182,7 +182,8 @@ export class FormsTools {
         if (args.startAt) params.append('startAt', String(args.startAt));
         if (args.endAt) params.append('endAt', String(args.endAt));
         if (args.skip) params.append('skip', String(args.skip));
-        if (args.limit) params.append('limit', String(args.limit));
+        // Papyrus (19-oct): GHL rechaza limit > 100.
+        params.append('limit', String(Math.min(Number(args.limit) || 20, 100)));
         if (args.page) params.append('page', String(args.page));
         
         return this.ghlClient.makeRequest('GET', `/forms/submissions?formId=${formId}&${params.toString()}`);

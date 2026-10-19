@@ -768,7 +768,8 @@ export class SocialMediaTools {
     if (params.accountIds) body.accountIds = params.accountIds;
     if (params.postType) body.postType = params.postType;
 
-    const response = await this.ghlClient.makeRequest('POST', '/social-media-posting/statistics', body as Record<string, unknown>);
+    const locationId = this.ghlClient.getConfig().locationId;
+    const response = await this.ghlClient.makeRequest('POST', `/social-media-posting/statistics?locationId=${encodeURIComponent(locationId)}`, { locationId, ...body } as Record<string, unknown>);
 
     return {
       success: true,

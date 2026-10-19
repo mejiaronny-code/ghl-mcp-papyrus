@@ -122,7 +122,7 @@ export class NotesTools {
       case 'create_note':
         return this.ghlClient.makeRequest('POST', '/notes/', this.body(args), { version: NOTES_VERSION });
       case 'search_notes':
-        return this.ghlClient.makeRequest('POST', '/notes/search', this.body(args), { version: NOTES_VERSION });
+        return this.ghlClient.makeRequest('POST', '/notes/search', { locationId: this.ghlClient.getConfig().locationId, ...(this.body(args) || {}) }, { version: NOTES_VERSION });
       case 'get_note':
         return this.ghlClient.makeRequest('GET', `/notes/${this.id(args)}`, undefined, { version: NOTES_VERSION });
       case 'update_note':

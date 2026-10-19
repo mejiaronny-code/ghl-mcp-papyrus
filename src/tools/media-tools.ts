@@ -344,7 +344,7 @@ export class MediaTools {
         altId: params.altId || this.ghlClient.getConfig().locationId,
         ...(params.offset !== undefined && { offset: params.offset }),
         ...(params.limit !== undefined && { limit: params.limit }),
-        ...(params.type && { type: params.type }),
+        type: params.type || 'file', // Papyrus (19-oct): GHL exige type
         ...(params.query && { query: params.query }),
         ...(params.parentId && { parentId: params.parentId })
       };

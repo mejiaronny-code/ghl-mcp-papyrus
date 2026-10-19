@@ -365,7 +365,13 @@ export class UsersTools {
       case 'get_users': {
         const params = new URLSearchParams();
         params.append('locationId', locationId);
-        if (args.companyId) params.append('companyId', String(args.companyId));
+        // Papyrus (19-oct): GHL exige companyId ("companyId should not be empty").
+        let companyId = args.companyId ? String(args.companyId) : '';
+        if (!companyId) {
+          const loc: any = await this.ghlClient.makeRequest('GET', `/locations/${locationId}`);
+          companyId = String(loc?.data?.location?.companyId || loc?.data?.companyId || '');
+        }
+        if (companyId) params.append('companyId', companyId);
         if (args.query) params.append('query', String(args.query));
         if (args.skip) params.append('skip', String(args.skip));
         if (args.limit) params.append('limit', String(args.limit));

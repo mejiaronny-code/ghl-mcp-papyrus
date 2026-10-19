@@ -333,7 +333,7 @@ export class AgentStudioTools {
 
       // ─── Get agent ─────────────────────────────────────────────────────────
       case 'ghl_get_agent': {
-        return this.ghlClient.makeRequest('GET', `/agent-studio/agent/${args.agentId}`);
+        return this.ghlClient.makeRequest('GET', `/agent-studio/agent/${args.agentId}?locationId=${encodeURIComponent(this.ghlClient.getConfig().locationId)}`);
       }
 
       // ─── Update agent ──────────────────────────────────────────────────────
