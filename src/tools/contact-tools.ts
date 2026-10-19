@@ -812,7 +812,7 @@ export class ContactTools {
     return response.data!;
   }
 
-  private async searchContacts(params: MCPSearchContactsParams): Promise<GHLSearchContactsResponse> {
+  private async searchContacts(params: MCPSearchContactsParams): Promise<unknown> {
     const response = await this.ghlClient.searchContacts({
         locationId: this.ghlClient.getConfig().locationId,
       query: params.query,
@@ -827,7 +827,33 @@ export class ContactTools {
       throw new Error(response.error?.message || 'Failed to search contacts');
     }
 
-    return response.data!;
+    // Papyrus (19-oct, bug en vivo): GHL devuelve 25 contactos con TODOS sus
+    // campos y `total` al final; el cliente corta respuestas largas (~12.000
+    // caracteres) y el corte se llevaba el total: "¿cuántos contactos tengo?"
+    // respondió 9 teniendo 42. El total va PRIMERO y cada contacto solo con
+    // los campos útiles para conversar (el detalle completo está en get_contact).
+    const data = response.data as GHLSearchContactsResponse;
+    const contacts = Array.isArray(data?.contacts) ? data.contacts : [];
+    const total = typeof data?.total === 'number' ? data.total : contacts.length;
+    return {
+      total,
+      returned: contacts.length,
+      note: total > contacts.length
+        ? `total = contacts in the whole account matching the search; only ${contacts.length} are listed below.`
+        : undefined,
+      contacts: contacts.map((c: any) => ({
+        id: c.id,
+        name: c.contactName || [c.firstName, c.lastName].filter(Boolean).join(' ') || undefined,
+        email: c.email || undefined,
+        phone: c.phone || undefined,
+        companyName: c.companyName || undefined,
+        tags: Array.isArray(c.tags) && c.tags.length ? c.tags : undefined,
+        source: c.source || undefined,
+        city: c.city || undefined,
+        dateAdded: c.dateAdded || undefined,
+        assignedTo: c.assignedTo || undefined,
+      })),
+    };
   }
 
   private async getContact(contactId: string): Promise<GHLContact> {
