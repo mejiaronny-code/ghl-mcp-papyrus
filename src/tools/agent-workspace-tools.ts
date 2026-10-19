@@ -701,6 +701,15 @@ export class AgentWorkspaceTools {
     const config = this.ghlClient.getConfig();
     const generation: ApiGeneration = config.apiGeneration === 'v2' ? 'v2' : 'v3';
     const locationId = locationArg(args, config.locationId);
+    // Papyrus (19-oct): with no usable input every read step is skipped and the
+    // tool used to answer an empty-but-successful result, which agents read as
+    // "there is no data" (e.g. crm_contact_workspace with neither contactId nor
+    // query for "how many contacts do I have?"). Fail loudly instead so the
+    // agent picks another tool or asks for the missing input.
+    if (spec.readPlan?.length && spec.readPlan.every((item) => !item.path(args, locationId, generation))) {
+      const inputs = Object.keys(spec.inputProperties || {}).join(', ') || 'more specific input';
+      throw new Error(`${name} needs at least one of: ${inputs}. It reads a single record; to list or count records use a search/list tool instead.`);
+    }
     const proposedActions = compactActions(spec.buildActions?.(args, locationId) || actionsFromReadPlan(spec, args, locationId, generation));
     const readResults = spec.readPlan ? await this.runReadPlan(spec, args, locationId, generation) : [];
 
