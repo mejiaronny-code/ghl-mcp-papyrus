@@ -439,13 +439,37 @@ export class OpportunityTools {
 
       const data = response.data as GHLSearchOpportunitiesResponse;
       const opportunities = Array.isArray(data.opportunities) ? data.opportunities : [];
-      
+      const total = typeof data.meta?.total === 'number' ? data.meta.total : opportunities.length;
+
+      // Papyrus (19-oct, bug en vivo): cada oportunidad trae el contacto completo
+      // anidado y el total viene al final (meta); el cliente corta respuestas
+      // largas y «muéstrame las oportunidades abiertas» salió truncada. Total
+      // PRIMERO y cada oportunidad solo con lo útil (detalle en get_opportunity).
       return {
         success: true,
-        opportunities,
-        meta: data.meta,
-        message: `Found ${opportunities.length} opportunities (${data.meta?.total || opportunities.length} total)`
-      };
+        total,
+        returned: opportunities.length,
+        message: `Found ${opportunities.length} opportunities (${total} total)`,
+        opportunities: opportunities.map((o: any) => ({
+          id: o.id,
+          name: o.name,
+          status: o.status,
+          monetaryValue: o.monetaryValue ?? undefined,
+          pipelineId: o.pipelineId,
+          pipelineStageId: o.pipelineStageId,
+          source: o.source || undefined,
+          assignedTo: o.assignedTo || undefined,
+          createdAt: o.createdAt,
+          lastStatusChangeAt: o.lastStatusChangeAt || undefined,
+          contact: o.contact ? {
+            id: o.contact.id,
+            name: o.contact.name || [o.contact.firstName, o.contact.lastName].filter(Boolean).join(' ') || undefined,
+            email: o.contact.email || undefined,
+            phone: o.contact.phone || undefined,
+          } : (o.contactId ? { id: o.contactId } : undefined),
+        })),
+        meta: { total, nextPageUrl: data.meta?.nextPageUrl, startAfterId: data.meta?.startAfterId, startAfter: data.meta?.startAfter },
+      } as any;
     } catch (error) {
       process.stderr.write(`[GHL MCP] Search opportunities error: ${JSON.stringify(error, null, 2)}\n`);
       throw new Error(`Failed to search opportunities: ${error instanceof Error ? error.message : String(error)}`);
