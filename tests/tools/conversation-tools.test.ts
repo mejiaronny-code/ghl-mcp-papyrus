@@ -133,6 +133,24 @@ describe('ConversationTools', () => {
       expect(result.message).toContain('Email sent successfully');
     });
 
+    it('builds the HTML body from plain text (GHL ignores message for emails)', async () => {
+      const spy = jest.spyOn(mockGhlClient, 'sendEmail');
+
+      await conversationTools.executeTool('send_email', {
+        contactId: 'contact_123',
+        subject: 'Prueba',
+        message: 'Hola <Ana>\nsegunda línea'
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        'contact_123',
+        'Prueba',
+        'Hola <Ana>\nsegunda línea',
+        '<p>Hola &lt;Ana&gt;<br>segunda línea</p>',
+        expect.anything()
+      );
+    });
+
     it('should send email with HTML content', async () => {
       const spy = jest.spyOn(mockGhlClient, 'sendEmail');
       
@@ -166,7 +184,7 @@ describe('ConversationTools', () => {
         'contact_123',
         'Test Subject',
         'Test message',
-        undefined,
+        '<p>Test message</p>',
         expect.objectContaining({
           emailCc: ['cc@example.com'],
           emailBcc: ['bcc@example.com']

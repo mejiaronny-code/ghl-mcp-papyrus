@@ -43,6 +43,14 @@ import {
  * Conversation Tools Class
  * Implements MCP tools for messaging and conversation management
  */
+export function textToEmailHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `<p>${escaped.replace(/\r?\n/g, '<br>')}</p>`;
+}
+
 export class ConversationTools {
   constructor(private ghlClient: GHLApiClient) {}
 
@@ -814,11 +822,16 @@ export class ConversationTools {
    */
   private async sendEmail(params: MCPSendEmailParams): Promise<{ success: boolean; messageId: string; conversationId: string; emailMessageId?: string; message: string }> {
     try {
+      // Papyrus (20-oct, bug en vivo): para correos la API de GHL toma el
+      // cuerpo de `html` (`message` es para SMS) y con solo `message`
+      // respondía 422 «There is no message or attachments». Sin `html`, se
+      // arma desde el texto plano, escapado y con saltos de línea.
+      const html = params.html || (params.message ? textToEmailHtml(params.message) : undefined);
       const response = await this.ghlClient.sendEmail(
         params.contactId,
         params.subject,
         params.message,
-        params.html,
+        html,
         {
           emailFrom: params.emailFrom,
           emailCc: params.emailCc,
