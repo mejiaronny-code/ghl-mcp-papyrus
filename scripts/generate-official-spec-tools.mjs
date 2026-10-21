@@ -206,12 +206,28 @@ export class OfficialSpecTools {
     }
 
     if (endpoint.method !== 'GET' && (endpoint.method !== 'DELETE' || endpoint.requestBodySchema)) {
-      properties.body = {
-        type: 'object',
-        description: 'Request body. When omitted, non-path and non-query arguments are sent as the JSON body.',
-        additionalProperties: true,
-        ...(endpoint.requestBodySchema || {}),
-      };
+      // Bug en vivo 21-oct: un body "libre" (additionalProperties: true sin
+      // properties) hace que el modelo INVENTE campos (search_notes con
+      // contactName → 422 de GHL). El body siempre sale de la especificación
+      // oficial; si no hay una con properties reales, la herramienta se
+      // oculta en el registro (BROKEN_TOOLS) en vez de quedar libre.
+      const bodySchema = resolveBodySchema(endpoint.requestBodySchema, endpoint.schemaDefinitions);
+      const bodyProperties = bodySchema && isRecord(bodySchema.properties) ? Object.keys(bodySchema.properties) : [];
+      if (bodyProperties.length > 0) {
+        properties.body = {
+          ...bodySchema,
+          type: 'object',
+          description: 'Request body. When omitted, non-path and non-query arguments are sent as the JSON body.',
+        };
+      } else if (bodySchema) {
+        // La spec declara el cuerpo VACÍO (p.ej. un DELETE): nada que pedir.
+      } else {
+        properties.body = {
+          type: 'object',
+          description: 'Request body. When omitted, non-path and non-query arguments are sent as the JSON body.',
+          additionalProperties: true,
+        };
+      }
     }
 
     return {
@@ -315,6 +331,67 @@ function sanitizeSchema(schema: Record<string, unknown> | undefined): Record<str
     if (allowed.has(key)) clean[key] = value;
   }
   return clean;
+}
+
+// ─── Resolución de $ref en runtime ─────────────────────────────
+// Los requestBodySchema llegan como {$ref: '#/components/schemas/X'} con las
+// definiciones en endpoint.schemaDefinitions. El $ref suelto no le sirve al
+// modelo: hay que expandirlo a properties concretas (con nombres, tipos,
+// requeridos y descripciones de la especificación oficial de GHL).
+
+const MAX_REF_DEPTH = 8;
+
+function resolveRefs(
+  schema: Record<string, unknown> | undefined,
+  defs: Record<string, unknown> | undefined,
+  depth = 0,
+): Record<string, unknown> | undefined {
+  if (!schema || depth > MAX_REF_DEPTH) return undefined;
+
+  if (typeof schema.$ref === 'string') {
+    if (!schema.$ref.startsWith('#/components/schemas/')) return undefined;
+    const name = schema.$ref
+      .slice('#/components/schemas/'.length)
+      .replace(/~1/g, '/')
+      .replace(/~0/g, '~');
+    const def = defs?.[name];
+    if (!isRecord(def)) return undefined;
+    const { $ref: _ref, ...rest } = schema;
+    const resolved = resolveRefs(def, defs, depth + 1);
+    return resolved ? { ...resolved, ...rest } : undefined;
+  }
+
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'components') continue;
+    // La spec oficial de GHL a veces trae "examples" escalar; Ajv exige array
+    // y revienta la compilación. "examples" es documentación, no validación.
+    if (key === 'examples' && !Array.isArray(value)) continue;
+    if (isRecord(value)) {
+      const nested = resolveRefs(value, defs, depth + 1);
+      clean[key] = nested ?? value;
+      continue;
+    }
+    if (Array.isArray(value)) {
+      clean[key] = value.map((item) => (isRecord(item) ? (resolveRefs(item, defs, depth + 1) ?? item) : item));
+      continue;
+    }
+    clean[key] = value;
+  }
+  return clean;
+}
+
+// Cuerpo con esquema real tras resolver $refs: properties pobladas, o el
+// marcador de cuerpo VACÍO que la spec declara explícitamente ({properties:{}}).
+// undefined = sin spec útil (libre u otra cosa que no es un objeto con campos).
+function resolveBodySchema(
+  requestBodySchema: Record<string, unknown> | undefined,
+  schemaDefinitions: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!requestBodySchema) return undefined;
+  const resolved = resolveRefs(requestBodySchema, schemaDefinitions);
+  if (!resolved || !isRecord(resolved.properties)) return undefined;
+  return sanitizeSchema(resolved);
 }
 
 function resolveEndpointDataPath(): string {

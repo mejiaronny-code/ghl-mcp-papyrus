@@ -135,20 +135,44 @@ describe('OfficialSpecTools v3 routing + access preflight', () => {
     const client = new MockToolClient({ locationId: 'loc', apiGeneration: 'v3', version: 'v3' });
     const tools = new OfficialSpecTools(client);
     const endpoint = tools.getToolDefinitions().find((tool: any) =>
+      tool.name === 'official_knowledge_base_deletetrainedurlsforknowledgebase_2'
+    ) as any;
+
+    expect(endpoint).toBeDefined();
+    // El body ya no es libre: sus propiedades vienen de la spec oficial.
+    const body = endpoint.inputSchema.properties.body;
+    expect(body).toBeDefined();
+    expect(body.properties.knowledgeBaseId).toBeDefined();
+    expect(body.properties.urlIds).toBeDefined();
+
+    await tools.handleToolCall(endpoint.name, {
+      locationId: 'loc',
+      knowledgeBaseId: 'kb1',
+      urlIds: ['u1', 'u2'],
+    });
+
+    expect(client.lastMethod).toBe('DELETE');
+    expect(client.lastPath).toBe('/knowledge-bases/crawler');
+    expect(client.lastBody).toEqual({ locationId: 'loc', knowledgeBaseId: 'kb1', urlIds: ['u1', 'u2'] });
+  });
+
+  it('omits the body property for DELETE operations whose spec body is empty', async () => {
+    const client = new MockToolClient({ locationId: 'loc', apiGeneration: 'v3', version: 'v3' });
+    const tools = new OfficialSpecTools(client);
+    const endpoint = tools.getToolDefinitions().find((tool: any) =>
       tool.name === 'official_calendars_delete_event'
     ) as any;
 
     expect(endpoint).toBeDefined();
-    expect(endpoint.inputSchema.properties.body).toBeDefined();
+    // La spec declara el cuerpo VACÍO: no se expone un body libre que invite
+    // al modelo a inventar campos (bug 21-oct), simplemente no hay body.
+    expect(endpoint.inputSchema.properties.body).toBeUndefined();
 
-    await tools.handleToolCall(endpoint.name, {
-      eventId: 'event/123',
-      body: { notify: true, reason: 'duplicate' },
-    });
+    await tools.handleToolCall(endpoint.name, { eventId: 'event/123' });
 
     expect(client.lastMethod).toBe('DELETE');
     expect(client.lastPath).toBe('/calendars/events/event%2F123');
-    expect(client.lastBody).toEqual({ notify: true, reason: 'duplicate' });
+    expect(client.lastBody).toBeUndefined();
   });
 
   it('serializes comma-delimited OpenAPI array query parameters as one value', async () => {

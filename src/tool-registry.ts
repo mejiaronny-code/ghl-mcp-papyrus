@@ -67,7 +67,59 @@ import { VERIFIED_BROKEN_TOOLS, INFERRED_BROKEN_TOOLS } from './verified-broken-
 
 // Papyrus (19-oct, scripts/audit-tools.mjs): listed but with no handler in its
 // module — every call answered "Unknown tool".
-const BROKEN_TOOLS: ReadonlySet<string> = new Set(['get_csv_upload_status']);
+//
+// Papyrus (21-oct, tests/scripts/freeform-schemas.test.ts): herramientas cuyo
+// cuerpo o algún parámetro es un objeto LIBRE (sin properties reales, con o
+// sin additionalProperties) porque la especificación oficial no lo tipa (o no
+// existe en el repo). Con cuerpo libre el modelo INVENTA campos (bug en vivo:
+// «busca las notas de Ronny» → search_notes con contactName → 422 de GHL).
+// Ocultas hasta tener esquemas tipados; el barrido de freeform-schemas.test
+// falla si alguna herramienta visible vuelve a quedar libre.
+const BROKEN_TOOLS: ReadonlySet<string> = new Set([
+  'get_csv_upload_status',
+  // Notas v3 (2026-04-21) sin spec oficial: body/payload libres. Siguen
+  // visibles get_note/delete_note (tipadas) y get_contact_notes para leer
+  // las notas de un contacto.
+  'create_note',
+  'search_notes',
+  'update_note',
+  'update_note_attachments',
+  'update_note_relations',
+  'restore_note',
+  // Manuscritas con objetos libres y sin spec disponible en el repo
+  // (permissions de usuarios, properties de registros custom, testData,
+  // actionParameters, notificationSettings, config de versión de agente).
+  'create_object_record',
+  'update_object_record',
+  'test_trigger',
+  'create_user',
+  'update_user',
+  'create_voice_ai_action',
+  'update_voice_ai_action',
+  'send_proposal_document',
+  'ghl_update_agent_version',
+  // Oficiales sin requestBodySchema en la spec, o con objetos anidados que la
+  // propia spec deja sin estructura (advancedOptions, meta, inputVariables,
+  // basicCredentials, numberType, status, location/account, type…).
+  'official_ad_publishing_fb_duplicate_adset',
+  'official_ad_publishing_fb_duplicate_ad',
+  'official_ad_publishing_google_publish_ad',
+  'official_ad_publishing_google_upsert_campaign',
+  'official_ad_publishing_li_upsert_campaign_group',
+  'official_brand_boards_set_default_brand_voice',
+  'official_calendars_add_calendar_to_schedule',
+  'official_social_planner_attach_oauth_accounts',
+  'official_social_planner_create_like',
+  'official_social_planner_updatequeue',
+  'official_social_media_posting_set_google_locations',
+  'official_social_media_posting_attach_facebook_page_group',
+  'official_opportunities_create_pipeline',
+  'official_opportunities_update_pipeline',
+  'official_agent_studio_executeagent',
+  'official_agent_studio_executeagent_deprecated',
+  'official_marketplace_migrateconnection',
+  'official_phone_system_purchase_number_for_location',
+]);
 
 // ─── Types ──────────────────────────────────────────────────
 
