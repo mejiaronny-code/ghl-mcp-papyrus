@@ -85,7 +85,7 @@ describe('ToolRegistry profiles', () => {
     ['v2', 'full'],
     ['v2', 'raw'],
   ] as const)(
-    'keeps the internal workflow builder unregistered and dispatches public workflow deletion in %s/%s mode',
+    'keeps the internal workflow builder unregistered and dispatches the public workflow module in %s/%s mode',
     async (generation, profile) => {
       process.env.GHL_TOOL_PROFILE = profile;
       const registry = new ToolRegistry({
@@ -106,15 +106,15 @@ describe('ToolRegistry profiles', () => {
         return { module: 'public' };
       };
 
-      await expect(registry.callTool('ghl_delete_workflow', { workflowId: 'public-id' }))
+      await expect(registry.callTool('ghl_get_workflows', {}))
         .resolves.toEqual({ module: 'public' });
-      expect(calls).toEqual(['public:ghl_delete_workflow']);
+      expect(calls).toEqual(['public:ghl_get_workflows']);
 
       const inventoryByTool = new Map(registry.getToolInventory().map((tool) => [tool.name, tool]));
-      expect(inventoryByTool.get('ghl_delete_workflow')).toMatchObject({
-        module: 'workflows',
-        destructive: true,
-      });
+      expect(inventoryByTool.get('ghl_get_workflows')).toMatchObject({ module: 'workflows' });
+      // 26-oct: DELETE /workflows/{id} no existe en la API oficial (solo GET
+      // /workflows/): oculta en NOT_IN_OFFICIAL_SPEC_TOOLS.
+      expect(inventoryByTool.has('ghl_delete_workflow')).toBe(false);
       // The private internal workflow-builder surface must not be exposed.
       for (const name of ['ghl_delete_workflow_internal', 'ghl_create_workflow', 'ghl_list_workflows_full', 'ghl_get_workflow_full', 'ghl_update_workflow_actions', 'ghl_publish_workflow', 'ghl_clone_workflow']) {
         expect(inventoryByTool.has(name)).toBe(false);
