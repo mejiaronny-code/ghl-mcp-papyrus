@@ -50,6 +50,11 @@ export const VERIFIED_BROKEN_TOOLS: ReadonlySet<string> = new Set([
   'ghl_list_email_providers',
   'ghl_search_available_numbers',
   'list_saas_locations_by_company',
+  // 26-oct, en vivo desde Papyrus: /reputation/reviews → 401 «Token source/channel
+  // mismatch» (no acepta token de integración privada) y /reputation/stats → 404.
+  // El workspace de reputación solo leía esas dos: siempre «éxito» vacío.
+  'get_reviews',
+  'crm_reputation_workspace',
 ]);
 
 // Inferidas (19-oct, scripts/route-siblings.mjs): comparten prefijo de ruta con

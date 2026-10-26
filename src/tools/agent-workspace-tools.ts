@@ -63,7 +63,8 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
     },
     readPlan: [
       { label: 'Contact profile', tool: 'get_contact', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}` : undefined },
-      { label: 'Contact search', tool: 'search_contacts', method: 'GET', path: (args, locationId) => stringArg(args.query) ? `/contacts/search?locationId=${enc(locationId)}&query=${enc(stringArg(args.query))}` : undefined },
+      // 26-oct (Papyrus, en vivo): era GET /contacts/search → GHL 400. La búsqueda es POST con cuerpo.
+      { label: 'Contact search', tool: 'search_contacts', method: 'POST', path: (args) => stringArg(args.query) ? '/contacts/search' : undefined, body: (args, locationId) => ({ locationId, pageLimit: 10, query: stringArg(args.query) }) },
       { label: 'Contact tasks', tool: 'get_contact_tasks', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/tasks` : undefined },
       { label: 'Contact notes', tool: 'get_contact_notes', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/notes` : undefined },
     ],
@@ -101,7 +102,7 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
       { label: 'Recent contacts', tool: 'search_contacts', method: 'POST', path: () => '/contacts/search', body: (args, locationId) => ({ locationId, pageLimit: numberArg(args.limit) || 5 }) },
       { label: 'Open opportunities', tool: 'search_opportunities', method: 'GET', path: (_args, locationId, generation) => opportunitySearchPath(locationId, generation, { status: 'open' }) },
       { label: 'Calendars', tool: 'get_calendars', method: 'GET', path: (_args, locationId) => `/calendars/?locationId=${enc(locationId)}` },
-      { label: 'Reviews', tool: 'get_reviews', method: 'GET', path: (_args, locationId) => `/reputation/reviews?locationId=${enc(locationId)}` },
+      // 26-oct: sin «Reviews» (/reputation/reviews → 401 «Token source/channel mismatch» con token privado).
     ],
   },
   {
