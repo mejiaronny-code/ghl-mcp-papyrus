@@ -111,6 +111,38 @@ describe('lecturas de los workspaces contra la spec oficial de GHL', () => {
     expect(llamadas.map((l) => l.path)).toEqual(['/contacts/search']);
   });
 
+  // Papyrus (26-oct, en vivo): nombre + correo en la misma búsqueda → GHL 0.
+  it.each([
+    ['ronny mejia — mejiaalejandro403@gmail.com — +50498102793', 'mejiaalejandro403@gmail.com'],
+    ['Ronny Mejia correo@prueba.com', 'correo@prueba.com'],
+    ['Ronny Mejia +504 887 15634', '+50488715634'],
+    ['Ronny Mejia', 'Ronny Mejia'],
+  ])('la búsqueda usa el dato exacto: %s', async (query, esperado) => {
+    const cuerpos: any[] = [];
+    const client = {
+      getConfig: () => ({ accessToken: 't', baseUrl: 'https://x', version: '2021-07-28', locationId: 'loc_123', apiGeneration: 'v2' }),
+      makeRequest: async (_m: string, path: string, body: any) => {
+        if (path.startsWith('/contacts/search')) cuerpos.push(body);
+        return { success: true, data: { contacts: [] } };
+      },
+    };
+    await new AgentWorkspaceTools(client as any).handleToolCall('crm_contact_workspace', { query });
+    expect(cuerpos[0].query).toBe(esperado);
+  });
+
+  it.each(['None', 'null', 'undefined', '  '])('locationId «%s» se ignora y usa el de la conexión', async (valor) => {
+    const cuerpos: any[] = [];
+    const client = {
+      getConfig: () => ({ accessToken: 't', baseUrl: 'https://x', version: '2021-07-28', locationId: 'loc_123', apiGeneration: 'v2' }),
+      makeRequest: async (_m: string, path: string, body: any) => {
+        if (path.startsWith('/contacts/search')) cuerpos.push(body);
+        return { success: true, data: { contacts: [] } };
+      },
+    };
+    await new AgentWorkspaceTools(client as any).handleToolCall('crm_contact_workspace', { query: 'Ronny', locationId: valor });
+    expect(cuerpos[0].locationId).toBe('loc_123');
+  });
+
   it('con contactId explícito no repite pasos', async () => {
     const { tools, llamadas } = contactoWorkspace({ success: true, data: { contacts: [{ id: 'C-9' }] } });
     await tools.handleToolCall('crm_contact_workspace', { contactId: 'C-1', query: 'Ronny' });

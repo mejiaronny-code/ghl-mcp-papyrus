@@ -68,7 +68,7 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
     readPlan: [
       { label: 'Contact profile', tool: 'get_contact', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}` : undefined },
       // 26-oct (Papyrus, en vivo): era GET /contacts/search → GHL 400. La búsqueda es POST con cuerpo.
-      { label: 'Contact search', tool: 'search_contacts', method: 'POST', path: (args) => stringArg(args.query) ? '/contacts/search' : undefined, body: (args, locationId) => ({ locationId, pageLimit: 10, query: stringArg(args.query) }) },
+      { label: 'Contact search', tool: 'search_contacts', method: 'POST', path: (args) => stringArg(args.query) ? '/contacts/search' : undefined, body: (args, locationId) => ({ locationId, pageLimit: 10, query: consultaPrecisa(args.query) }) },
       { label: 'Contact tasks', tool: 'get_contact_tasks', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/tasks` : undefined },
       { label: 'Contact notes', tool: 'get_contact_notes', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/notes` : undefined },
     ],
@@ -118,7 +118,7 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
     access: 'read',
     inputProperties: { query: { type: 'string' }, limit: { type: 'number' } },
     readPlan: [
-      { label: 'Contacts', tool: 'search_contacts', method: 'POST', path: () => '/contacts/search', body: (args, locationId) => ({ locationId, pageLimit: numberArg(args.limit) || 5, query: args.query }) },
+      { label: 'Contacts', tool: 'search_contacts', method: 'POST', path: () => '/contacts/search', body: (args, locationId) => ({ locationId, pageLimit: numberArg(args.limit) || 5, query: consultaPrecisa(args.query) }) },
       { label: 'Conversations', tool: 'search_conversations', method: 'GET', path: (args, locationId) => `/conversations/search?locationId=${enc(locationId)}${stringArg(args.query) ? `&query=${enc(stringArg(args.query))}` : ''}` },
       { label: 'Opportunities', tool: 'search_opportunities', method: 'GET', path: (_args, locationId, generation) => opportunitySearchPath(locationId, generation) },
       { label: 'Calendars', tool: 'get_calendars', method: 'GET', path: (_args, locationId) => `/calendars/?locationId=${enc(locationId)}` },
@@ -909,8 +909,28 @@ function locationArg(args: JsonRecord, fallback: string): string {
   return stringArg(args.locationId) || fallback || '';
 }
 
+// Papyrus (26-oct, en vivo): el agente mandó locationId: "None" y se usó como
+// id real. «None»/«null»/«undefined» escritos como texto = ausente.
+const VALOR_NULO_RE = /^(none|null|undefined)$/i;
+
 function stringArg(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  if (typeof value !== 'string') return undefined;
+  const limpio = value.trim();
+  return limpio && !VALOR_NULO_RE.test(limpio) ? limpio : undefined;
+}
+
+// Papyrus (26-oct, en vivo): el agente mezclaba nombre y correo en la búsqueda
+// («Ronny Mejia — mejia…@gmail.com») y GHL la toma como UNA frase → 0
+// resultados. Si el texto trae un correo o un teléfono, se busca solo por ese
+// dato, que es exacto.
+function consultaPrecisa(value: unknown): string | undefined {
+  const texto = stringArg(value);
+  if (!texto) return undefined;
+  const correo = texto.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+  if (correo) return correo[0];
+  const telefono = texto.match(/\+?\d[\d\s().-]{6,}\d/);
+  if (telefono) return telefono[0].replace(/[\s().-]/g, '');
+  return texto;
 }
 
 function numberArg(value: unknown): number | undefined {
