@@ -74,6 +74,50 @@ describe('lecturas de los workspaces contra la spec oficial de GHL', () => {
     });
   }
 
+  // Papyrus (26-oct): «ficha completa de Ronny con sus notas» → el workspace solo
+  // buscaba; las notas quedaban como acción propuesta y dependían de que el
+  // agente encadenara otra llamada. Con UN resultado, trae ficha/notas/tareas.
+  function contactoWorkspace(respuestaBusqueda: any) {
+    const llamadas: Ruta[] = [];
+    const client = {
+      getConfig: () => ({ accessToken: 't', baseUrl: 'https://x', version: '2021-07-28', locationId: 'loc_123', apiGeneration: 'v2' }),
+      makeRequest: async (method: string, path: string) => {
+        llamadas.push({ method, path });
+        if (path.startsWith('/contacts/search')) return respuestaBusqueda;
+        return { success: true, data: { ok: true } };
+      },
+    };
+    return { tools: new AgentWorkspaceTools(client as any), llamadas };
+  }
+
+  it('con UN contacto encontrado trae su ficha, notas y tareas (rutas oficiales)', async () => {
+    const { tools, llamadas } = contactoWorkspace({ success: true, data: { contacts: [{ id: 'C-1', firstName: 'Ronny' }] } });
+    const r: any = await tools.handleToolCall('crm_contact_workspace', { query: 'Ronny Mejia' });
+    const rutas = llamadas.map((l) => `${l.method} ${l.path}`);
+    expect(rutas).toEqual(expect.arrayContaining([
+      'GET /contacts/C-1', 'GET /contacts/C-1/notes', 'GET /contacts/C-1/tasks']));
+    expect(llamadas.every((l) => existeEnLaSpec(l.method, l.path))).toBe(true);
+    expect(r.readResults.map((x: any) => x.label)).toEqual(expect.arrayContaining([
+      'Contact search', 'Contact profile', 'Contact notes', 'Contact tasks']));
+  });
+
+  it.each([
+    ['dos homónimos', { success: true, data: { contacts: [{ id: 'C-1' }, { id: 'C-2' }] } }],
+    ['ninguno', { success: true, data: { contacts: [] } }],
+    ['búsqueda fallida', { success: false, error: 'GHL API Error (400)' }],
+  ])('con %s no elige a nadie', async (_caso, respuesta) => {
+    const { tools, llamadas } = contactoWorkspace(respuesta);
+    await tools.handleToolCall('crm_contact_workspace', { query: 'Ronny Mejia' });
+    expect(llamadas.map((l) => l.path)).toEqual(['/contacts/search']);
+  });
+
+  it('con contactId explícito no repite pasos', async () => {
+    const { tools, llamadas } = contactoWorkspace({ success: true, data: { contacts: [{ id: 'C-9' }] } });
+    await tools.handleToolCall('crm_contact_workspace', { contactId: 'C-1', query: 'Ronny' });
+    const rutas = llamadas.map((l) => l.path).sort();
+    expect(rutas).toEqual(['/contacts/C-1', '/contacts/C-1/notes', '/contacts/C-1/tasks', '/contacts/search'].sort());
+  });
+
   it('la búsqueda de contactos del workspace es POST /contacts/search con la consulta', async () => {
     const llamadas: Array<{ method: string; path: string; body: any }> = [];
     const client = {

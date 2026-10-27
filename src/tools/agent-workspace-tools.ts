@@ -30,6 +30,10 @@ type WorkspaceToolSpec = {
     path: (args: JsonRecord, locationId: string, generation: ApiGeneration) => string | undefined;
     body?: (args: JsonRecord, locationId: string) => JsonRecord;
   }>;
+  // Papyrus (26-oct): si la búsqueda por texto (paso `paso`) trae EXACTAMENTE
+  // un registro de `coleccion`, se ejecutan también los pasos que necesitaban
+  // su id en `arg` (ficha, notas, tareas). Con 2+ no se elige ninguno.
+  alUnico?: { paso: string; coleccion: string; arg: string };
 };
 
 const CONTACT_FIELDS = {
@@ -68,6 +72,7 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
       { label: 'Contact tasks', tool: 'get_contact_tasks', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/tasks` : undefined },
       { label: 'Contact notes', tool: 'get_contact_notes', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/notes` : undefined },
     ],
+    alUnico: { paso: 'Contact search', coleccion: 'contacts', arg: 'contactId' },
   },
   {
     name: 'crm_location_overview',
@@ -723,6 +728,15 @@ export class AgentWorkspaceTools {
     }
     const proposedActions = compactActions(spec.buildActions?.(args, locationId) || actionsFromReadPlan(spec, args, locationId, generation));
     const readResults = spec.readPlan ? await this.runReadPlan(spec, args, locationId, generation) : [];
+    const unico = spec.alUnico && !stringArg(args[spec.alUnico.arg])
+      ? idUnico(readResults, spec.alUnico.paso, spec.alUnico.coleccion)
+      : undefined;
+    if (spec.alUnico && unico) {
+      const conId = { ...args, [spec.alUnico.arg]: unico };
+      const pendientes = (spec.readPlan || []).filter((item) =>
+        !item.path(args, locationId, generation) && item.path(conId, locationId, generation));
+      readResults.push(...await this.runReadPlan(spec, conId, locationId, generation, pendientes));
+    }
 
     return {
       workflow: {
@@ -768,8 +782,9 @@ export class AgentWorkspaceTools {
     args: JsonRecord,
     locationId: string,
     generation: ApiGeneration,
+    pasos?: NonNullable<WorkspaceToolSpec['readPlan']>,
   ): Promise<unknown[]> {
-    const plan = spec.readPlan || [];
+    const plan = pasos || spec.readPlan || [];
     const results = await Promise.all(plan.map(async (item) => {
       const path = item.path(args, locationId, generation);
       if (!path) return undefined;
@@ -863,6 +878,17 @@ function resultSummary(readResults: unknown[], actions: WorkflowAction[]): JsonR
 // Papyrus (19-oct): the sample size used to be labelled `count`, and agents
 // answered "how many contacts?" with the 5-item sample ("tienes 5 contactos").
 // It is now `shown_in_this_sample`; a real `total` from GHL is kept as-is.
+// El id del ÚNICO registro que trajo un paso de búsqueda; undefined si trajo
+// 0, 2+ o falló (nunca se adivina entre varios).
+function idUnico(readResults: unknown[], paso: string, coleccion: string): string | undefined {
+  const resultado = readResults.find((r) => isRecord(r) && r.label === paso && r.success);
+  if (!isRecord(resultado) || !isRecord(resultado.data)) return undefined;
+  const grupo = resultado.data[coleccion];
+  if (!isRecord(grupo) || grupo.returned !== 1 || !Array.isArray(grupo.items)) return undefined;
+  const registro = grupo.items[0];
+  return isRecord(registro) ? stringArg(registro.id) : undefined;
+}
+
 function summarizeData(data: unknown): unknown {
   if (Array.isArray(data)) return { shown_in_this_sample: Math.min(data.length, 5), returned: data.length, items: data.slice(0, 5) };
   if (!isRecord(data)) return data;
