@@ -622,33 +622,30 @@ export class GHLApiClient {
         payload.startAfter = searchParams.startAfter;
       }
 
-      // Only add filters if we have valid filter values
+      // Papyrus (26-oct, en vivo): GHL espera `filters` como LISTA de
+      // {field, operator, value}. El objeto {email: "..."} respondía 400
+      // «value?.map is not a function». Verificado contra la API real:
+      // email/phone con «eq» y tags con «contains» (lista) filtran bien.
       if (searchParams.filters) {
-        const filters: any = {};
-        let hasFilters = false;
+        const filters: Array<{ field: string; operator: string; value: unknown }> = [];
+        const { email, phone, tags, dateAdded } = searchParams.filters;
 
-        if (searchParams.filters.email && typeof searchParams.filters.email === 'string' && searchParams.filters.email.trim()) {
-          filters.email = searchParams.filters.email.trim();
-          hasFilters = true;
+        if (typeof email === 'string' && email.trim()) {
+          filters.push({ field: 'email', operator: 'eq', value: email.trim() });
         }
-        
-        if (searchParams.filters.phone && typeof searchParams.filters.phone === 'string' && searchParams.filters.phone.trim()) {
-          filters.phone = searchParams.filters.phone.trim();
-          hasFilters = true;
+        if (typeof phone === 'string' && phone.trim()) {
+          filters.push({ field: 'phone', operator: 'eq', value: phone.trim() });
         }
-
-        if (searchParams.filters.tags && Array.isArray(searchParams.filters.tags) && searchParams.filters.tags.length > 0) {
-          filters.tags = searchParams.filters.tags;
-          hasFilters = true;
+        if (Array.isArray(tags) && tags.length > 0) {
+          filters.push({ field: 'tags', operator: 'contains', value: tags });
         }
-
-        if (searchParams.filters.dateAdded && typeof searchParams.filters.dateAdded === 'object') {
-          filters.dateAdded = searchParams.filters.dateAdded;
-          hasFilters = true;
+        // Sin llamador hoy y sin verificar en vivo: se conserva el campo con
+        // el operador de rango de la API.
+        if (dateAdded && typeof dateAdded === 'object') {
+          filters.push({ field: 'dateAdded', operator: 'range', value: dateAdded });
         }
 
-        // Only add filters object if we have actual filters
-        if (hasFilters) {
+        if (filters.length > 0) {
           payload.filters = filters;
         }
       }

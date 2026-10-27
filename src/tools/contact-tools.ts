@@ -99,6 +99,7 @@ export class ContactTools {
             query: { type: 'string', description: 'Search query string' },
             email: { type: 'string', description: 'Filter by email address' },
             phone: { type: 'string', description: 'Filter by phone number' },
+            tags: { type: 'array', items: { type: 'string' }, description: 'Only contacts that have these tags' },
             limit: { type: 'number', description: 'Maximum number of results (default: 25)' }
           }
         },
@@ -819,7 +820,8 @@ export class ContactTools {
       limit: params.limit,
       filters: {
         ...(params.email && { email: params.email }),
-        ...(params.phone && { phone: params.phone })
+        ...(params.phone && { phone: params.phone }),
+        ...(Array.isArray((params as any).tags) && (params as any).tags.length && { tags: (params as any).tags })
       }
     });
 
