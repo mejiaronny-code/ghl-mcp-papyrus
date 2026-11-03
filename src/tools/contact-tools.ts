@@ -9,6 +9,7 @@ import {
   MCPCreateContactParams,
   MCPSearchContactsParams,
   MCPUpdateContactParams,
+  MCPContactProfileFields,
   MCPAddContactTagsParams,
   MCPRemoveContactTagsParams,
   // Task Management
@@ -54,6 +55,32 @@ import {
   GHLFollowersResponse
 } from '../types/ghl-types.js';
 
+// Datos del perfil que la API de GHL acepta en crear/actualizar/upsert. update_contact
+// solo ofrecía nombre, correo, teléfono y etiquetas: «cámbiale la ciudad» era imposible.
+const CONTACT_PROFILE_PROPERTIES = {
+  address: { type: 'string', description: 'Street address' },
+  city: { type: 'string', description: 'City' },
+  state: { type: 'string', description: 'State or department' },
+  country: { type: 'string', description: 'Country' },
+  postalCode: { type: 'string', description: 'Postal code' },
+  website: { type: 'string', description: 'Website' },
+  timezone: { type: 'string', description: 'Timezone (IANA name)' },
+  companyName: { type: 'string', description: 'Company name' }
+};
+
+function contactProfileFields(params: MCPContactProfileFields) {
+  return {
+    address1: params.address,
+    city: params.city,
+    state: params.state,
+    country: params.country,
+    postalCode: params.postalCode,
+    website: params.website,
+    timezone: params.timezone,
+    companyName: params.companyName
+  };
+}
+
 /**
  * Contact Tools class
  * Provides comprehensive contact management capabilities
@@ -78,7 +105,8 @@ export class ContactTools {
             email: { type: 'string', description: 'Contact email address' },
             phone: { type: 'string', description: 'Contact phone number' },
             tags: { type: 'array', items: { type: 'string' }, description: 'Tags to assign to contact' },
-            source: { type: 'string', description: 'Source of the contact' }
+            source: { type: 'string', description: 'Source of the contact' },
+            ...CONTACT_PROFILE_PROPERTIES
           },
           required: ['email']
         },
@@ -140,7 +168,10 @@ export class ContactTools {
             lastName: { type: 'string', description: 'Contact last name' },
             email: { type: 'string', description: 'Contact email address' },
             phone: { type: 'string', description: 'Contact phone number' },
-            tags: { type: 'array', items: { type: 'string' }, description: 'Tags to assign to contact' }
+            tags: { type: 'array', items: { type: 'string' }, description: 'Tags to assign to contact' },
+            source: { type: 'string', description: 'Source of the contact' },
+            assignedTo: { type: 'string', description: 'User ID to assign contact to' },
+            ...CONTACT_PROFILE_PROPERTIES
           },
           required: ['contactId']
         },
@@ -446,7 +477,8 @@ export class ContactTools {
             phone: { type: 'string', description: 'Contact phone number' },
             tags: { type: 'array', items: { type: 'string' }, description: 'Tags to assign to contact' },
             source: { type: 'string', description: 'Source of the contact' },
-            assignedTo: { type: 'string', description: 'User ID to assign contact to' }
+            assignedTo: { type: 'string', description: 'User ID to assign contact to' },
+            ...CONTACT_PROFILE_PROPERTIES
           }
         },
         _meta: {
@@ -803,7 +835,8 @@ export class ContactTools {
         email: params.email,
         phone: params.phone,
         tags: params.tags,
-      source: params.source
+      source: params.source,
+      ...contactProfileFields(params)
     });
 
     if (!response.success) {
@@ -874,7 +907,10 @@ export class ContactTools {
       lastName: params.lastName,
       email: params.email,
       phone: params.phone,
-      tags: params.tags
+      tags: params.tags,
+      source: params.source,
+      assignedTo: params.assignedTo,
+      ...contactProfileFields(params)
     });
 
     if (!response.success) {

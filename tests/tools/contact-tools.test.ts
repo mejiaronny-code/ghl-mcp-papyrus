@@ -193,6 +193,27 @@ describe('ContactTools', () => {
     });
   });
 
+  describe('datos del perfil (ciudad, dirección…) en crear, actualizar y upsert', () => {
+    const CAMPOS = ['address', 'city', 'state', 'country', 'postalCode', 'website', 'timezone', 'companyName'];
+
+    it.each(['create_contact', 'update_contact', 'upsert_contact'])('%s los ofrece en su esquema', (nombre) => {
+      const tool = contactTools.getToolDefinitions().find((t: any) => t.name === nombre) as any;
+      for (const campo of CAMPOS) {
+        expect(tool.inputSchema.properties).toHaveProperty(campo);
+      }
+    });
+
+    it('update_contact los manda a GHL (address → address1)', async () => {
+      const espia = jest.spyOn(mockGhlClient, 'updateContact');
+      await contactTools.executeTool('update_contact', {
+        contactId: 'contact_123', city: 'Tegucigalpa', address: 'Calle 1'
+      });
+      expect(espia).toHaveBeenCalledWith('contact_123', expect.objectContaining({
+        city: 'Tegucigalpa', address1: 'Calle 1'
+      }));
+    });
+  });
+
   describe('add_contact_tags', () => {
     it('should add tags successfully', async () => {
       const result = await contactTools.executeTool('add_contact_tags', {

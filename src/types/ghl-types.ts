@@ -499,7 +499,18 @@ export interface GHLFollowersResponse {
 }
 
 // MCP Tool Parameters - Contact Operations
-export interface MCPCreateContactParams {
+export interface MCPContactProfileFields {
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  website?: string;
+  timezone?: string;
+  companyName?: string;
+}
+
+export interface MCPCreateContactParams extends MCPContactProfileFields {
   firstName?: string;
   lastName?: string;
   email: string;
@@ -515,13 +526,15 @@ export interface MCPSearchContactsParams {
   limit?: number;
 }
 
-export interface MCPUpdateContactParams {
+export interface MCPUpdateContactParams extends MCPContactProfileFields {
   contactId: string;
   firstName?: string;
   lastName?: string;
   email?: string;
   phone?: string;
   tags?: string[];
+  source?: string;
+  assignedTo?: string;
 }
 
 export interface MCPAddContactTagsParams {
