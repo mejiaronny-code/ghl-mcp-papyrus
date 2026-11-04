@@ -25,6 +25,16 @@ import {
   MCPAttachOAuthAccountParams
 } from '../types/ghl-types.js';
 
+/**
+ * La API de redes sociales de GHL responde { success, statusCode, results: {...} }.
+ * Leer `data.accounts` directamente daba siempre vacío: «0 cuentas» con Instagram y
+ * Facebook conectados. Sin `results` (otras versiones) se usa `data` tal cual.
+ */
+function desenvolver(respuesta: any): any {
+  const datos = respuesta?.data;
+  return datos?.results ?? datos ?? {};
+}
+
 export class SocialMediaTools {
   constructor(private ghlClient: GHLApiClient) {}
 
@@ -568,9 +578,9 @@ export class SocialMediaTools {
 
     return {
       success: true,
-      posts: response.data?.posts || [],
-      count: response.data?.count || 0,
-      message: `Found ${response.data?.count || 0} social media posts`
+      posts: desenvolver(response).posts || [],
+      count: desenvolver(response).count || 0,
+      message: `Found ${desenvolver(response).count || 0} social media posts`
     };
   }
 
@@ -590,7 +600,7 @@ export class SocialMediaTools {
 
     return {
       success: true,
-      post: response.data?.post,
+      post: desenvolver(response).post,
       message: `Social media post created successfully`
     };
   }
@@ -600,7 +610,7 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      post: response.data?.post,
+      post: desenvolver(response).post,
       message: `Retrieved social media post ${params.postId}`
     };
   }
@@ -629,8 +639,8 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      deletedCount: response.data?.deletedCount || 0,
-      message: `${response.data?.deletedCount || 0} social media posts deleted successfully`
+      deletedCount: desenvolver(response).deletedCount || 0,
+      message: `${desenvolver(response).deletedCount || 0} social media posts deleted successfully`
     };
   }
 
@@ -639,9 +649,9 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      accounts: response.data?.accounts || [],
-      groups: response.data?.groups || [],
-      message: `Retrieved ${response.data?.accounts?.length || 0} social media accounts and ${response.data?.groups?.length || 0} groups`
+      accounts: desenvolver(response).accounts || [],
+      groups: desenvolver(response).groups || [],
+      message: `Retrieved ${desenvolver(response).accounts?.length || 0} social media accounts and ${desenvolver(response).groups?.length || 0} groups`
     };
   }
 
@@ -667,9 +677,9 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      categories: response.data?.categories || [],
-      count: response.data?.count || 0,
-      message: `Retrieved ${response.data?.count || 0} social media categories`
+      categories: desenvolver(response).categories || [],
+      count: desenvolver(response).count || 0,
+      message: `Retrieved ${desenvolver(response).count || 0} social media categories`
     };
   }
 
@@ -678,7 +688,7 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      category: response.data?.category,
+      category: desenvolver(response).category,
       message: `Retrieved social media category ${params.categoryId}`
     };
   }
@@ -692,9 +702,9 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      tags: response.data?.tags || [],
-      count: response.data?.count || 0,
-      message: `Retrieved ${response.data?.count || 0} social media tags`
+      tags: desenvolver(response).tags || [],
+      count: desenvolver(response).count || 0,
+      message: `Retrieved ${desenvolver(response).count || 0} social media tags`
     };
   }
 
@@ -703,9 +713,9 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      tags: response.data?.tags || [],
-      count: response.data?.count || 0,
-      message: `Retrieved ${response.data?.count || 0} social media tags by IDs`
+      tags: desenvolver(response).tags || [],
+      count: desenvolver(response).count || 0,
+      message: `Retrieved ${desenvolver(response).count || 0} social media tags by IDs`
     };
   }
 
@@ -719,7 +729,7 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      oauthData: response.data,
+      oauthData: desenvolver(response),
       message: `OAuth process started for ${params.platform}`
     };
   }
@@ -755,7 +765,7 @@ export class SocialMediaTools {
     
     return {
       success: true,
-      platformAccounts: response.data,
+      platformAccounts: desenvolver(response),
       message: `Retrieved ${params.platform} accounts for OAuth ID ${params.accountId}`
     };
   }
@@ -773,7 +783,7 @@ export class SocialMediaTools {
 
     return {
       success: true,
-      statistics: response.data,
+      statistics: desenvolver(response),
       message: 'Social media statistics retrieved successfully'
     };
   }
@@ -788,7 +798,7 @@ export class SocialMediaTools {
 
     return {
       success: true,
-      result: response.data,
+      result: desenvolver(response),
       message: `Social media accounts set for location ${params.locationId}`
     };
   }
