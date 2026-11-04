@@ -35,6 +35,19 @@ function desenvolver(respuesta: any): any {
   return datos?.results ?? datos ?? {};
 }
 
+/**
+ * Solo la forma de una respuesta (campos y tamaños de listas), nunca sus valores:
+ * sirve para ver en los registros por qué algo salió vacío sin guardar datos del cliente.
+ */
+export function formaDe(valor: any, profundidad = 3): any {
+  if (Array.isArray(valor)) return `lista(${valor.length})`;
+  if (valor && typeof valor === 'object') {
+    if (profundidad <= 0) return 'objeto';
+    return Object.fromEntries(Object.entries(valor).map(([k, v]) => [k, formaDe(v, profundidad - 1)]));
+  }
+  return typeof valor;
+}
+
 export class SocialMediaTools {
   constructor(private ghlClient: GHLApiClient) {}
 
@@ -575,6 +588,10 @@ export class SocialMediaTools {
       includeUsers: params.includeUsers?.toString() || 'true',
       postType: params.postType
     });
+
+    if (!(desenvolver(response).posts || []).length) {
+      console.error(`[social-posts] vacío; forma de la respuesta: ${JSON.stringify(formaDe(response?.data))}`);
+    }
 
     return {
       success: true,
