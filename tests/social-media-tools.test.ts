@@ -35,17 +35,13 @@ describe('SocialMediaTools: respuesta envuelta en results', () => {
     expect(r.count).toBe(1);
   });
 
-  it('si sale vacío registra solo la forma, nunca los valores, y no cambia la respuesta', async () => {
-    const espia = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    const r = await con('searchSocialPosts', { results: { items: [{ _id: 'secreto' }], total: 1, nota: 'privado' } })
-      .executeTool('search_social_posts', { type: 'all', accounts: '', skip: '0', limit: '10', fromDate: 'x', toDate: 'y' });
-    const registro = String(espia.mock.calls[0][0]);
-    espia.mockRestore();
-    expect(registro).toContain('lista(1)');
-    expect(registro).toContain('total');
-    expect(registro).not.toContain('secreto');
-    expect(registro).not.toContain('privado');
-    expect(Object.keys(r).sort()).toEqual(['count', 'message', 'posts', 'success']);
-    expect(r.posts).toEqual([]);
+  it('avisa que las publicaciones nativas no aparecen, con o sin resultados, sin campos nuevos', async () => {
+    const args = { type: 'all', accounts: '', skip: '0', limit: '10', fromDate: 'x', toDate: 'y' };
+    for (const posts of [[], [{ _id: 'p1' }]]) {
+      const r = await con('searchSocialPosts', { results: { posts, count: posts.length } })
+        .executeTool('search_social_posts', args);
+      expect(r.message).toContain('Solo incluye lo creado desde el planificador');
+      expect(Object.keys(r).sort()).toEqual(['count', 'message', 'posts', 'success']);
+    }
   });
 });

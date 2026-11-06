@@ -36,17 +36,13 @@ function desenvolver(respuesta: any): any {
 }
 
 /**
- * Solo la forma de una respuesta (campos y tamaños de listas), nunca sus valores:
- * sirve para ver en los registros por qué algo salió vacío sin guardar datos del cliente.
+ * Comprobado en vivo (5-nov-2026): la API solo entrega lo creado desde el planificador; lo
+ * publicado directo en Facebook o Instagram sale en el panel de GHL pero no aquí. Va en el
+ * mensaje y no en otro campo para que un resultado vacío se siga reconociendo como vacío.
  */
-export function formaDe(valor: any, profundidad = 3): any {
-  if (Array.isArray(valor)) return `lista(${valor.length})`;
-  if (valor && typeof valor === 'object') {
-    if (profundidad <= 0) return 'objeto';
-    return Object.fromEntries(Object.entries(valor).map(([k, v]) => [k, formaDe(v, profundidad - 1)]));
-  }
-  return typeof valor;
-}
+const AVISO_PUBLICACIONES_NATIVAS =
+  'Solo incluye lo creado desde el planificador: lo publicado directo en Facebook o Instagram ' +
+  'no aparece aquí, aunque exista. Dilo al responder y no presentes esta cifra como el total.';
 
 export class SocialMediaTools {
   constructor(private ghlClient: GHLApiClient) {}
@@ -589,15 +585,11 @@ export class SocialMediaTools {
       postType: params.postType
     });
 
-    if (!(desenvolver(response).posts || []).length) {
-      console.error(`[social-posts] vacío; forma de la respuesta: ${JSON.stringify(formaDe(response?.data))}`);
-    }
-
     return {
       success: true,
       posts: desenvolver(response).posts || [],
       count: desenvolver(response).count || 0,
-      message: `Found ${desenvolver(response).count || 0} social media posts`
+      message: `Found ${desenvolver(response).count || 0} social media posts. ${AVISO_PUBLICACIONES_NATIVAS}`
     };
   }
 
