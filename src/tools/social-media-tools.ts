@@ -469,24 +469,21 @@ export class SocialMediaTools {
       },
       {
         name: 'get_social_media_statistics',
-        description: 'Get social media posting statistics for accounts',
+        description: 'Get analytics of the connected social media accounts: always the last 7 days compared with the previous 7 days (the API has no other period). Without profileIds it uses every connected account.',
         inputSchema: {
           type: 'object',
           properties: {
-            accountIds: {
+            profileIds: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Array of social media account IDs to get statistics for'
+              description: "Only these accounts: the 'profileId' from get_social_accounts. Leave empty for all connected accounts."
             },
-            fromDate: { type: 'string', description: 'Start date (ISO format)' },
-            toDate: { type: 'string', description: 'End date (ISO format)' },
-            postType: {
-              type: 'string',
-              enum: ['post', 'story', 'reel'],
-              description: 'Type of post to get statistics for'
+            platforms: {
+              type: 'array',
+              items: { type: 'string', enum: ['facebook', 'instagram', 'linkedin', 'google', 'pinterest', 'youtube', 'tiktok'] },
+              description: 'Only these platforms. Leave empty for all.'
             }
-          },
-          required: ['fromDate', 'toDate']
+          }
         },
         _meta: {
           labels: {
@@ -779,21 +776,41 @@ export class SocialMediaTools {
     };
   }
 
-  private async getSocialMediaStatistics(params: { accountIds?: string[]; fromDate: string; toDate: string; postType?: string }) {
-    const body: Record<string, unknown> = {
-      fromDate: params.fromDate,
-      toDate: params.toDate
-    };
-    if (params.accountIds) body.accountIds = params.accountIds;
-    if (params.postType) body.postType = params.postType;
+  /**
+   * 6-nov-2026: la API solo acepta profileIds (obligatorio) y platforms, y el periodo es fijo. La
+   * herramienta pedía fechas inventadas y GHL la rechazaba siempre (422). Quien pregunta no conoce
+   * los profileId, así que por defecto van todas las cuentas que permiten ver estadísticas.
+   */
+  private async getSocialMediaStatistics(params: { profileIds?: string[]; platforms?: string[] }) {
+    let profileIds = params.profileIds?.filter(Boolean) ?? [];
+    let sinPermiso: string[] = [];
+    if (!profileIds.length) {
+      const cuentas: any[] = desenvolver(await this.ghlClient.getSocialAccounts()).accounts || [];
+      const elegibles = cuentas.filter((c) =>
+        c.profileId && !c.deleted && (!params.platforms?.length || params.platforms.includes(c.platform)));
+      profileIds = elegibles.filter((c) => c.hasStatisticsPermissions !== false).map((c) => c.profileId);
+      sinPermiso = elegibles.filter((c) => c.hasStatisticsPermissions === false).map((c) => c.name || c.platform);
+      if (!profileIds.length) {
+        return {
+          success: true,
+          statistics: null,
+          message: sinPermiso.length
+            ? `Estas cuentas no dan permiso para ver estadísticas: ${sinPermiso.join(', ')}.`
+            : 'No hay cuentas de redes sociales conectadas que tengan estadísticas.'
+        };
+      }
+    }
+    const body: Record<string, unknown> = { profileIds };
+    if (params.platforms?.length) body.platforms = params.platforms;
 
     const locationId = this.ghlClient.getConfig().locationId;
-    const response = await this.ghlClient.makeRequest('POST', `/social-media-posting/statistics?locationId=${encodeURIComponent(locationId)}`, { locationId, ...body } as Record<string, unknown>);
+    const response = await this.ghlClient.makeRequest('POST', `/social-media-posting/statistics?locationId=${encodeURIComponent(locationId)}`, body);
 
     return {
       success: true,
       statistics: desenvolver(response),
-      message: 'Social media statistics retrieved successfully'
+      message: 'Periodo: últimos 7 días comparados con los 7 anteriores; el sistema no ofrece otro. Si se pidió otro periodo, dilo.'
+        + (sinPermiso.length ? ` No incluye, por falta de permiso: ${sinPermiso.join(', ')}.` : '')
     };
   }
 

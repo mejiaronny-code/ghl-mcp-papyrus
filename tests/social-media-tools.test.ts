@@ -45,3 +45,64 @@ describe('SocialMediaTools: respuesta envuelta en results', () => {
     }
   });
 });
+
+describe('SocialMediaTools: estadísticas (6-nov, GHL rechazaba siempre con 422)', () => {
+  const ig = { profileId: 'p-ig', name: 'marca_ig', platform: 'instagram', hasStatisticsPermissions: true };
+  const fb = { profileId: 'p-fb', name: 'Marca FB', platform: 'facebook', hasStatisticsPermissions: false };
+  const borrada = { profileId: 'p-x', name: 'vieja', platform: 'instagram', deleted: true };
+
+  function cliente(accounts: any[]) {
+    const llamadas: any[] = [];
+    const client = {
+      getConfig: () => ({ locationId: 'LOC' }),
+      getSocialAccounts: async () => ({ data: { results: { accounts } } }),
+      makeRequest: async (metodo: string, ruta: string, body: any) => {
+        llamadas.push({ metodo, ruta, body });
+        return { data: { results: { totals: { posts: 3 } } } };
+      }
+    };
+    return { tools: new SocialMediaTools(client as any), llamadas };
+  }
+  const ejecutar = (tools: SocialMediaTools, args: any = {}) => tools.executeTool('get_social_media_statistics', args);
+
+  it('manda solo lo que la API acepta y el locationId va en la ruta', async () => {
+    const { tools, llamadas } = cliente([ig]);
+    const r = await ejecutar(tools);
+    expect(llamadas).toEqual([{ metodo: 'POST', ruta: '/social-media-posting/statistics?locationId=LOC', body: { profileIds: ['p-ig'] } }]);
+    expect(r.statistics).toEqual({ totals: { posts: 3 } });
+    expect(r.message).toContain('últimos 7 días');
+  });
+
+  it('el esquema ya no pide fechas ni obliga a dar cuentas', () => {
+    const { tools } = cliente([]);
+    const tool = tools.getTools().find((x) => x.name === 'get_social_media_statistics')!;
+    expect(Object.keys(tool.inputSchema.properties as object).sort()).toEqual(['platforms', 'profileIds']);
+    expect((tool.inputSchema as any).required).toBeUndefined();
+  });
+
+  it('deja fuera las borradas y avisa de las que no dan permiso', async () => {
+    const { tools, llamadas } = cliente([ig, fb, borrada]);
+    const r = await ejecutar(tools);
+    expect(llamadas[0].body.profileIds).toEqual(['p-ig']);
+    expect(r.message).toContain('Marca FB');
+  });
+
+  it('respeta las cuentas y plataformas pedidas', async () => {
+    const { tools, llamadas } = cliente([ig, fb]);
+    await ejecutar(tools, { profileIds: ['otra'], platforms: ['facebook'] });
+    expect(llamadas[0].body).toEqual({ profileIds: ['otra'], platforms: ['facebook'] });
+    const segundo = cliente([ig, { ...fb, hasStatisticsPermissions: true }]);
+    await ejecutar(segundo.tools, { platforms: ['facebook'] });
+    expect(segundo.llamadas[0].body.profileIds).toEqual(['p-fb']);
+  });
+
+  it('sin cuentas útiles no llama a GHL y lo dice sin inventar', async () => {
+    for (const [cuentas, frase] of [[[], 'No hay cuentas'], [[fb], 'no dan permiso']] as [any[], string][]) {
+      const { tools, llamadas } = cliente(cuentas);
+      const r = await ejecutar(tools);
+      expect(llamadas).toEqual([]);
+      expect(r.statistics).toBeNull();
+      expect(r.message).toContain(frase);
+    }
+  });
+});
